@@ -23,6 +23,10 @@ import {
   unlikePost,
   hasLiked,
   getDb,
+  getFollowingPosts,
+  getAllCreators,
+  searchCreators,
+  getCreatorsByCategory,
 } from "./db";
 import { creators } from "../drizzle/schema";
 
@@ -217,6 +221,34 @@ export const appRouter = router({
           content: input.content,
         });
         return { success: true };
+      }),
+  }),
+
+  // Feed router
+  feed: router({
+    getFollowingPosts: protectedProcedure.query(async ({ ctx }) => {
+      return await getFollowingPosts(ctx.user.id);
+    }),
+  }),
+
+  // Discover router
+  discover: router({
+    getAllCreators: publicProcedure
+      .input(z.object({ limit: z.number().optional() }).optional())
+      .query(async ({ input }) => {
+        return await getAllCreators(input?.limit);
+      }),
+    
+    searchCreators: publicProcedure
+      .input(z.object({ query: z.string(), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        return await searchCreators(input.query, input.limit);
+      }),
+    
+    getByCategory: publicProcedure
+      .input(z.object({ category: z.string(), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        return await getCreatorsByCategory(input.category, input.limit);
       }),
   }),
 

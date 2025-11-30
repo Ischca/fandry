@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { eq, and, or, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users, 
@@ -143,8 +143,8 @@ export async function getPostById(id: number) {
 export async function createPost(post: InsertPost) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(posts).values(post);
-  return result;
+  const [result] = await db.insert(posts).values(post);
+  return { id: result.insertId, ...post };
 }
 
 // Subscription plan queries
@@ -225,4 +225,82 @@ export async function hasLiked(userId: number, postId: number) {
   if (!db) return false;
   const result = await db.select().from(likes).where(and(eq(likes.userId, userId), eq(likes.postId, postId))).limit(1);
   return result.length > 0;
+}
+
+// Feed queries
+export async function getFollowingPosts(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Get posts from creators that the user follows
+  const result = await db
+    .select({
+      id: posts.id,
+      creatorId: posts.creatorId,
+      title: posts.title,
+      content: posts.content,
+      mediaUrls: posts.mediaUrls,
+      likeCount: posts.likeCount,
+      commentCount: posts.commentCount,
+      createdAt: posts.createdAt,
+      creator: {
+        id: creators.id,
+        username: creators.username,
+        displayName: creators.displayName,
+        avatarUrl: creators.avatarUrl,
+      },
+    })
+    .from(posts)
+    .innerJoin(follows, eq(follows.creatorId, posts.creatorId))
+    .innerJoin(creators, eq(creators.id, posts.creatorId))
+    .where(eq(follows.userId, userId))
+    .orderBy(desc(posts.createdAt))
+    .limit(50);
+  
+  return result;
+}
+
+export async function getAllCreators(limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select()
+    .from(creators)
+    .orderBy(desc(creators.followerCount))
+    .limit(limit);
+  
+  return result;
+}
+
+export async function searchCreators(query: string, limit: number = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select()
+    .from(creators)
+    .where(
+      or(
+        sql`${creators.username} LIKE ${`%${query}%`}`,
+        sql`${creators.displayName} LIKE ${`%${query}%`}`
+      )
+    )
+    .limit(limit);
+  
+  return result;
+}
+
+export async function getCreatorsByCategory(category: string, limit: number = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select()
+    .from(creators)
+    .where(eq(creators.category, category))
+    .orderBy(desc(creators.followerCount))
+    .limit(limit);
+  
+  return result;
 }

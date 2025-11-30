@@ -1,0 +1,86 @@
+import { Heart, MessageCircle } from "lucide-react";
+import { Link } from "wouter";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+
+interface PostCardProps {
+  post: {
+    id: number;
+    title: string | null;
+    content: string;
+    mediaUrls?: string | null;
+    likeCount: number;
+    commentCount: number;
+    createdAt: Date;
+    creator: {
+      id: number;
+      username: string;
+      displayName: string;
+      avatarUrl?: string | null;
+    };
+  };
+}
+
+export function PostCard({ post }: PostCardProps) {
+  const mediaUrls = post.mediaUrls ? JSON.parse(post.mediaUrls) : [];
+  const firstMedia = mediaUrls[0];
+
+  return (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+      <CardContent className="p-0">
+        {/* Creator Header */}
+        <Link href={`/creator/${post.creator.username}`}>
+          <div className="p-4 flex items-center gap-3 hover:bg-accent/50 transition-colors cursor-pointer">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={post.creator.avatarUrl || undefined} />
+              <AvatarFallback>{post.creator.displayName[0]}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold text-sm">{post.creator.displayName}</p>
+              <p className="text-xs text-muted-foreground">@{post.creator.username}</p>
+            </div>
+          </div>
+        </Link>
+
+        {/* Media */}
+        {firstMedia && (
+          <div className="relative aspect-square">
+            <img
+              src={firstMedia}
+              alt={post.title || "投稿画像"}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="p-4 space-y-2">
+          {post.title && (
+            <h3 className="font-bold text-lg">{post.title || ""}</h3>
+          )}
+          <p className="text-sm text-muted-foreground line-clamp-3">
+            {post.content}
+          </p>
+
+          {/* Actions */}
+          <div className="flex items-center gap-4 pt-2">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <Heart className="h-4 w-4" />
+              <span className="text-sm">{post.likeCount}</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="gap-2">
+              <MessageCircle className="h-4 w-4" />
+              <span className="text-sm">{post.commentCount}</span>
+            </Button>
+          </div>
+
+          {/* Timestamp */}
+          <p className="text-xs text-muted-foreground">
+            {new Date(post.createdAt).toLocaleDateString("ja-JP")}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

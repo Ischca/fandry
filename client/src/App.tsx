@@ -17,7 +17,7 @@ function Router() {
       <Route path={"/feed"} component={Feed} />
       <Route path={"/discover"} component={Discover} />
       <Route path={"/my"} component={MyPage} />
-      <Route path={"/:username"} component={CreatorPage} />
+      <Route path={"/creator/:username"} component={CreatorPage} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

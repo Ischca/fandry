@@ -28,6 +28,7 @@ import {
   getAllCreators,
   searchCreators,
   getCreatorsByCategory,
+  getSubscriptionPlansByCreatorId,
 } from "./db";
 import { creators } from "../drizzle/schema";
 
@@ -273,6 +274,15 @@ export const appRouter = router({
       .input(z.object({ postId: z.number() }))
       .query(async ({ ctx, input }) => {
         return { liked: await hasLiked(ctx.user.id, input.postId) };
+      }),
+  }),
+
+  // Subscription plan router
+  subscriptionPlan: router({
+    getByCreatorId: publicProcedure
+      .input(z.object({ creatorId: z.number() }))
+      .query(async ({ input }) => {
+        return await getSubscriptionPlansByCreatorId(input.creatorId);
       }),
   }),
 });

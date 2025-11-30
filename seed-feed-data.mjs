@@ -329,6 +329,59 @@ for (const postData of postsData) {
 
 console.log(`✅ Created ${postsData.length} posts`);
 
+// 月額支援プランを作成（最初の3人のクリエイターにのみ）
+for (let i = 0; i < 3; i++) {
+  const creator = createdCreators[i];
+  
+  // プラン3階層を作成
+  await db.insert(schema.subscriptionPlans).values([
+    {
+      creatorId: creator.id,
+      name: "ベーシックプラン",
+      description: `${creator.displayName}を応援する基本プランです。`,
+      price: 500,
+      tier: 1,
+      benefits: JSON.stringify([
+        "会員限定投稿を閲覧可能",
+        "月一回のメンバー限定ライブ配信に参加",
+        "コメント優先表示",
+      ]),
+      subscriberCount: Math.floor(Math.random() * 50) + 10,
+    },
+    {
+      creatorId: creator.id,
+      name: "スタンダードプラン",
+      description: `より多くの特典を受けられるプランです。`,
+      price: 1000,
+      tier: 2,
+      benefits: JSON.stringify([
+        "ベーシックプランの全特典",
+        "限定コンテンツへのアクセス",
+        "月一回の個別メッセージ返信",
+        "オリジナルデジタル特典",
+      ]),
+      subscriberCount: Math.floor(Math.random() * 30) + 5,
+    },
+    {
+      creatorId: creator.id,
+      name: "プレミアムプラン",
+      description: `最高峰のパトロン体験を提供します。`,
+      price: 3000,
+      tier: 3,
+      benefits: JSON.stringify([
+        "スタンダードプランの全特典",
+        "毎月のオンライン交流会への招待",
+        "限定グッズやオリジナル作品の優先購入権",
+        "名前をクレジットに記載",
+        "制作過程の裏側情報を共有",
+      ]),
+      subscriberCount: Math.floor(Math.random() * 15) + 2,
+    },
+  ]);
+}
+
+console.log("✅ Created subscription plans for 3 creators");
+
 // いくつかの投稿にいいねを追加
 const allPosts = await db.select().from(schema.posts).limit(10);
 for (const post of allPosts.slice(0, 5)) {

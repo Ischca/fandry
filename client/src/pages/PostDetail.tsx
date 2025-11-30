@@ -16,6 +16,33 @@ export default function PostDetail() {
     { enabled: postId > 0 }
   );
 
+  const { data: likeData } = trpc.like.check.useQuery(
+    { postId },
+    { enabled: isAuthenticated && postId > 0 }
+  );
+
+  // 会員限定投稿の場合、クリエイターのプランを取得
+  const { data: plans } = trpc.subscriptionPlan.getByCreatorId.useQuery(
+    { creatorId: post?.creatorId || 0 },
+    { enabled: post?.type === "membership" && !!post?.creatorId }
+  );
+
+  const likeMutation = trpc.like.toggle.useMutation({
+    onSuccess: () => {
+      // Refetch like status and post data (to update like count)
+      trpc.useUtils().like.check.invalidate({ postId });
+      trpc.useUtils().post.getById.invalidate({ id: postId });
+    },
+  });
+
+  const handleLike = () => {
+    if (!isAuthenticated) {
+      alert("いいねするにはログインが必要です。");
+      return;
+    }
+    likeMutation.mutate({ postId });
+  };
+
   const handlePurchase = () => {
     alert("決済機能は現在準備中です。");
   };
@@ -23,6 +50,8 @@ export default function PostDetail() {
   const handleSubscribe = () => {
     alert("月額支援機能は現在準備中です。");
   };
+
+  const isLiked = likeData?.liked || false;
 
   if (isLoading) {
     return (
@@ -191,6 +220,28 @@ export default function PostDetail() {
                     <p className="text-muted-foreground">
                       {post.creatorDisplayName}の月額支援プランに加入すると閲覧できます。
                     </p>
+                    {plans && plans.length > 0 && (() => {
+                      const requiredPlans = plans.filter(p => p.tier >= (post.membershipTier || 1));
+                      if (requiredPlans.length > 0) {
+                        return (
+                          <div className="w-full space-y-2">
+                            <p className="text-sm font-medium">閲覧に必要なプラン:</p>
+                            <div className="grid gap-2">
+                              {requiredPlans.map(plan => (
+                                <div key={plan.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                  <div>
+                                    <p className="font-medium">{plan.name}</p>
+                                    <p className="text-xs text-muted-foreground">{plan.subscriberCount}人が加入中</p>
+                                  </div>
+                                  <p className="text-lg font-bold">￥{plan.price.toLocaleString()}<span className="text-xs font-normal text-muted-foreground">/月</span></p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     {isAuthenticated ? (
                       <Button size="lg" onClick={handleSubscribe}>
                         プランを見る
@@ -213,17 +264,23 @@ export default function PostDetail() {
             </div>
           )}
 
-          {/* 投稿メタ情報 */}
-          <div className="flex items-center gap-6 text-sm text-muted-foreground pt-4 border-t">
-            <div className="flex items-center gap-2">
-              <Heart className="h-4 w-4" />
+          {/* アクションボタン */}
+          <div className="flex items-center gap-4 pt-4 border-t">
+            <Button
+              variant={isLiked ? "default" : "outline"}
+              size="sm"
+              onClick={handleLike}
+              disabled={likeMutation.isPending}
+              className="gap-2"
+            >
+              <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
               <span>{post.likeCount}</span>
-            </div>
-            <div className="flex items-center gap-2">
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2">
               <MessageCircle className="h-4 w-4" />
               <span>{post.commentCount}</span>
-            </div>
-            <div className="ml-auto">
+            </Button>
+            <div className="ml-auto text-sm text-muted-foreground">
               {new Date(post.createdAt).toLocaleDateString("ja-JP")}
             </div>
           </div>

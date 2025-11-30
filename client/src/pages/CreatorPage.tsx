@@ -29,6 +29,11 @@ export default function CreatorPage() {
     { enabled: isAuthenticated && !!creator }
   );
 
+  const { data: plans, isLoading: plansLoading } = trpc.subscriptionPlan.getByCreatorId.useQuery(
+    { creatorId: creator?.id || 0 },
+    { enabled: !!creator }
+  );
+
   const followMutation = trpc.follow.toggle.useMutation({
     onSuccess: () => {
       // Refetch follow status
@@ -184,7 +189,57 @@ export default function CreatorPage() {
         </div>
       </div>
 
-      <div className="container py-8">
+      <div className="container py-8 space-y-12">
+        {/* 月額支援プラン */}
+        {plans && plans.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-xl font-bold">月額支援プラン</h2>
+            <div className="grid gap-3 md:grid-cols-3">
+              {plans.map((plan) => {
+                let benefits: string[] = [];
+                try {
+                  benefits = plan.benefits ? JSON.parse(plan.benefits) : [];
+                } catch {
+                  benefits = [];
+                }
+                return (
+                  <Card key={plan.id} className="p-4 space-y-3 hover:shadow-md transition-shadow">
+                    <div className="flex items-baseline justify-between">
+                      <h3 className="font-bold">{plan.name}</h3>
+                      <p className="text-lg font-bold">￥{plan.price.toLocaleString()}<span className="text-xs font-normal text-muted-foreground">/月</span></p>
+                    </div>
+                    {plan.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">{plan.description}</p>
+                    )}
+                    {benefits.length > 0 && (
+                      <ul className="space-y-1 text-xs">
+                        {benefits.slice(0, 3).map((benefit, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="text-primary mt-0.5 text-xs">✓</span>
+                            <span className="line-clamp-1">{benefit}</span>
+                          </li>
+                        ))}
+                        {benefits.length > 3 && (
+                          <li className="text-muted-foreground">+{benefits.length - 3}件の特典</li>
+                        )}
+                      </ul>
+                    )}
+                    <div className="flex items-center justify-between pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        {plan.subscriberCount}人が加入中
+                      </p>
+                      <Button size="sm" onClick={() => alert("決済機能は未実装です")}>
+                        加入
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div>
         <h2 className="text-2xl font-bold mb-6">投稿</h2>
         {postsLoading ? (
           <p className="text-muted-foreground">読み込み中...</p>
@@ -208,6 +263,7 @@ export default function CreatorPage() {
         ) : (
           <p className="text-muted-foreground">まだ投稿がありません</p>
         )}
+        </div>
       </div>
       
       {isAuthenticated && (

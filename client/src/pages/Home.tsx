@@ -2,10 +2,19 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
 import { Heart, Sparkles, Users, Zap } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useEffect } from "react";
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
+
+  // ログイン済みユーザーはフィードページにリダイレクト
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocation("/feed");
+    }
+  }, [isAuthenticated, setLocation]);
 
   return (
     <div className="min-h-screen">

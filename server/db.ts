@@ -1,6 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { 
+  InsertUser, users, 
+  creators, InsertCreator,
+  posts, InsertPost,
+  subscriptionPlans,
+  tips, InsertTip,
+  follows,
+  comments, InsertComment,
+  likes
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +98,131 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Creator queries
+export async function getCreatorByUsername(username: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(creators).where(eq(creators.username, username)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCreatorById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(creators).where(eq(creators.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createCreator(creator: InsertCreator) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(creators).values(creator);
+  return result;
+}
+
+export async function updateCreator(id: number, updates: Partial<InsertCreator>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(creators).set(updates).where(eq(creators.id, id));
+}
+
+// Post queries
+export async function getPostsByCreatorId(creatorId: number, limit = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(posts).where(eq(posts.creatorId, creatorId)).orderBy(desc(posts.createdAt)).limit(limit);
+}
+
+export async function getPostById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createPost(post: InsertPost) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(posts).values(post);
+  return result;
+}
+
+// Subscription plan queries
+export async function getSubscriptionPlansByCreatorId(creatorId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(subscriptionPlans).where(eq(subscriptionPlans.creatorId, creatorId));
+}
+
+// Tip queries
+export async function createTip(tip: InsertTip) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(tips).values(tip);
+  return result;
+}
+
+export async function getTipsByCreatorId(creatorId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(tips).where(eq(tips.creatorId, creatorId)).orderBy(desc(tips.createdAt)).limit(limit);
+}
+
+// Follow queries
+export async function followCreator(userId: number, creatorId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(follows).values({ userId, creatorId });
+  await db.update(creators).set({ followerCount: sql`${creators.followerCount} + 1` }).where(eq(creators.id, creatorId));
+}
+
+export async function unfollowCreator(userId: number, creatorId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(follows).where(and(eq(follows.userId, userId), eq(follows.creatorId, creatorId)));
+  await db.update(creators).set({ followerCount: sql`${creators.followerCount} - 1` }).where(eq(creators.id, creatorId));
+}
+
+export async function isFollowing(userId: number, creatorId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.select().from(follows).where(and(eq(follows.userId, userId), eq(follows.creatorId, creatorId))).limit(1);
+  return result.length > 0;
+}
+
+// Comment queries
+export async function getCommentsByPostId(postId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(comments).where(eq(comments.postId, postId)).orderBy(desc(comments.createdAt));
+}
+
+export async function createComment(comment: InsertComment) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(comments).values(comment);
+  await db.update(posts).set({ commentCount: sql`${posts.commentCount} + 1` }).where(eq(posts.id, comment.postId));
+  return result;
+}
+
+// Like queries
+export async function likePost(userId: number, postId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(likes).values({ userId, postId });
+  await db.update(posts).set({ likeCount: sql`${posts.likeCount} + 1` }).where(eq(posts.id, postId));
+}
+
+export async function unlikePost(userId: number, postId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(likes).where(and(eq(likes.userId, userId), eq(likes.postId, postId)));
+  await db.update(posts).set({ likeCount: sql`${posts.likeCount} - 1` }).where(eq(posts.id, postId));
+}
+
+export async function hasLiked(userId: number, postId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.select().from(likes).where(and(eq(likes.userId, userId), eq(likes.postId, postId))).limit(1);
+  return result.length > 0;
+}

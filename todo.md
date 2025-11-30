@@ -1,4 +1,4 @@
-# Cheer - プロジェクトTODO
+# Fandry - プロジェクトTODO
 
 ## フェーズ1: データベースとバックエンドAPI
 - [x] データベーススキーマ設計（creators, posts, tips, subscriptions, patron_badges等）
@@ -160,7 +160,17 @@
 - [x] チェックポイント作成
 
 ## GitHubリポジトリの作成とプッシュ
-- [ ] GitHubに新規リポジトリを作成
-- [ ] Gitの初期化とコミット
-- [ ] GitHubへのプッシュ
-- [ ] 動作確認
+- [x] GitHubに新規リポジトリを作成
+- [x] Gitの初期化とコミット
+- [x] GitHubへのプッシュ
+- [x] 動作確認
+
+## GitHubリポジトリのリネーム
+- [x] GitHubリポジトリを「cheer」から「fandry」にリネーム
+- [x] ローカルのリモートURL更新
+- [x] 動作確認
+
+## プロジェクト内部のブランディング統一
+- [x] package.jsonの名前を「fandry」に変更
+- [x] todo.mdのタイトルを更新
+- [ ] 変更をコミットしてGitHubにプッシュ

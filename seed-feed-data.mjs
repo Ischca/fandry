@@ -39,6 +39,7 @@ const creatorsData = [
     bio: "イラストレーター。ファンタジー系のキャラクターデザインが得意です🎨",
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=yuki",
     category: "illustration",
+    socialLinks: JSON.stringify({ twitter: "https://twitter.com/artist_yuki", instagram: "https://instagram.com/artist_yuki" }),
   },
   {
     username: "writer_hana",
@@ -46,6 +47,7 @@ const creatorsData = [
     bio: "小説家。恋愛小説とSF短編を書いています📚",
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=hana",
     category: "writing",
+    socialLinks: JSON.stringify({ twitter: "https://twitter.com/writer_hana", website: "https://hana-novels.com" }),
   },
   {
     username: "musician_ren",
@@ -53,6 +55,7 @@ const creatorsData = [
     bio: "作曲家・ピアニスト。オリジナル曲を制作しています🎹",
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=ren",
     category: "music",
+    socialLinks: JSON.stringify({ youtube: "https://youtube.com/@musician_ren", twitter: "https://twitter.com/musician_ren" }),
   },
   {
     username: "photographer_sora",
@@ -60,6 +63,7 @@ const creatorsData = [
     bio: "風景写真家。日本各地の美しい景色を撮影しています📷",
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=sora",
     category: "photography",
+    socialLinks: JSON.stringify({ instagram: "https://instagram.com/photographer_sora", website: "https://sora-photos.com" }),
   },
   {
     username: "designer_kai",
@@ -67,6 +71,7 @@ const creatorsData = [
     bio: "グラフィックデザイナー。ロゴやポスターのデザインをしています✨",
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=kai",
     category: "design",
+    socialLinks: JSON.stringify({ twitter: "https://twitter.com/designer_kai", website: "https://kai-design.com" }),
   },
   {
     username: "animator_miku",
@@ -74,6 +79,7 @@ const creatorsData = [
     bio: "アニメーター。2Dアニメーション制作をしています🎬",
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=miku",
     category: "animation",
+    socialLinks: JSON.stringify({ youtube: "https://youtube.com/@animator_miku", twitter: "https://twitter.com/animator_miku" }),
   },
   {
     username: "voice_actor_ryo",
@@ -81,6 +87,7 @@ const creatorsData = [
     bio: "声優・ナレーター。キャラクターボイスの収録をしています🎤",
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=ryo",
     category: "voice",
+    socialLinks: JSON.stringify({ youtube: "https://youtube.com/@voice_actor_ryo", twitter: "https://twitter.com/voice_actor_ryo" }),
   },
 ];
 
@@ -109,6 +116,7 @@ for (const creatorData of creatorsData) {
       bio: creatorData.bio,
       avatarUrl: creatorData.avatarUrl,
       category: creatorData.category,
+      socialLinks: creatorData.socialLinks,
       followerCount: Math.floor(Math.random() * 1000) + 50,
       totalSupport: Math.floor(Math.random() * 100000) + 1000,
     })

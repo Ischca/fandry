@@ -2,10 +2,11 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Heart, Share2, User } from "lucide-react";
+import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe } from "lucide-react";
 import { useParams, Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { TipDialog } from "@/components/TipDialog";
+import { PostCard } from "@/components/PostCard";
 import { useState } from "react";
 
 export default function CreatorPage() {
@@ -22,6 +23,27 @@ export default function CreatorPage() {
     { username: username || "", limit: 20 },
     { enabled: !!username }
   );
+
+  const { data: followData } = trpc.follow.check.useQuery(
+    { creatorId: creator?.id || 0 },
+    { enabled: isAuthenticated && !!creator }
+  );
+
+  const followMutation = trpc.follow.toggle.useMutation({
+    onSuccess: () => {
+      // Refetch follow status
+      trpc.useUtils().follow.check.invalidate({ creatorId: creator?.id || 0 });
+      // Refetch creator data to update follower count
+      trpc.useUtils().creator.getByUsername.invalidate({ username: username || "" });
+    },
+  });
+
+  const handleFollowToggle = () => {
+    if (!creator) return;
+    followMutation.mutate({ creatorId: creator.id });
+  };
+
+  const isFollowing = followData?.following || false;
 
   if (creatorLoading) {
     return (
@@ -98,6 +120,38 @@ export default function CreatorPage() {
               <span>{creator.followerCount} フォロワー</span>
               {creator.category && <span className="px-3 py-1 rounded-full bg-accent/20">{creator.category}</span>}
             </div>
+            {creator.socialLinks && (() => {
+              try {
+                const links = JSON.parse(creator.socialLinks);
+                if (Object.keys(links).length === 0) return null;
+                return (
+                  <div className="flex items-center gap-3">
+                    {links.twitter && (
+                      <a href={links.twitter} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                        <Twitter className="h-5 w-5" />
+                      </a>
+                    )}
+                    {links.instagram && (
+                      <a href={links.instagram} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                        <Instagram className="h-5 w-5" />
+                      </a>
+                    )}
+                    {links.youtube && (
+                      <a href={links.youtube} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                        <Youtube className="h-5 w-5" />
+                      </a>
+                    )}
+                    {links.website && (
+                      <a href={links.website} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                        <Globe className="h-5 w-5" />
+                      </a>
+                    )}
+                  </div>
+                );
+              } catch {
+                return null;
+              }
+            })()}
           </div>
 
           <div className="flex gap-2">
@@ -106,7 +160,13 @@ export default function CreatorPage() {
             </Button>
             {isAuthenticated ? (
               <>
-                <Button variant="outline">フォロー</Button>
+                <Button 
+                  variant={isFollowing ? "default" : "outline"}
+                  onClick={handleFollowToggle}
+                  disabled={followMutation.isPending}
+                >
+                  {isFollowing ? "フォロー中" : "フォロー"}
+                </Button>
                 <Button className="gap-2" onClick={() => setTipDialogOpen(true)}>
                   <Heart className="h-4 w-4" />
                   応援する
@@ -129,17 +189,20 @@ export default function CreatorPage() {
         {postsLoading ? (
           <p className="text-muted-foreground">読み込み中...</p>
         ) : posts && posts.length > 0 ? (
-          <div className="grid gap-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
-              <Card key={post.id} className="p-6 space-y-4">
-                {post.title && <h3 className="text-xl font-semibold">{post.title}</h3>}
-                <p className="text-foreground whitespace-pre-wrap">{post.content}</p>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>{new Date(post.createdAt).toLocaleDateString("ja-JP")}</span>
-                  <span>❤️ {post.likeCount}</span>
-                  <span>💬 {post.commentCount}</span>
-                </div>
-              </Card>
+              <PostCard
+                key={post.id}
+                post={{
+                  ...post,
+                  creator: {
+                    id: creator.id,
+                    username: creator.username,
+                    displayName: creator.displayName,
+                    avatarUrl: creator.avatarUrl,
+                  },
+                }}
+              />
             ))}
           </div>
         ) : (

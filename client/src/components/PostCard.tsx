@@ -47,26 +47,28 @@ export function PostCard({ post }: PostCardProps) {
 
         {/* Media */}
         {firstMedia && (
-          <div className="relative aspect-square">
-            <img
-              src={firstMedia}
-              alt={post.title || "投稿画像"}
-              className={`w-full h-full object-cover ${
-                post.type === "paid" || post.type === "membership"
-                  ? "blur-md"
-                  : ""
-              }`}
-            />
-            {(post.type === "paid" || post.type === "membership") && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                <div className="bg-background/90 px-4 py-2 rounded-lg">
-                  <p className="text-sm font-semibold">
-                    {post.type === "paid" ? `¥${post.price}` : "会員限定"}
-                  </p>
+          <Link href={`/post/${post.id}`}>
+            <div className="relative aspect-square cursor-pointer hover:opacity-90 transition-opacity">
+              <img
+                src={firstMedia}
+                alt={post.title || "投稿画像"}
+                className={`w-full h-full object-cover ${
+                  post.type === "paid" || post.type === "membership"
+                    ? "blur-md"
+                    : ""
+                }`}
+              />
+              {(post.type === "paid" || post.type === "membership") && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <div className="bg-background/90 px-4 py-2 rounded-lg">
+                    <p className="text-sm font-semibold">
+                      {post.type === "paid" ? `¥${post.price}` : "会員限定"}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </Link>
         )}
 
         {/* Content */}

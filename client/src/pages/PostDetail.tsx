@@ -93,6 +93,43 @@ export default function PostDetail() {
             <h1 className="text-2xl font-bold">{post.title}</h1>
           )}
 
+          {/* メディア表示 */}
+          {post.hasAccess && post.mediaUrls && (() => {
+            const mediaUrls = JSON.parse(post.mediaUrls);
+            if (mediaUrls.length === 0) return null;
+            
+            return (
+              <div className="space-y-4">
+                {mediaUrls.map((url: string, index: number) => {
+                  // 画像か動画かを判定（簡易的な判定）
+                  const isVideo = url.match(/\.(mp4|webm|ogg|mov)$/i);
+                  
+                  if (isVideo) {
+                    return (
+                      <video
+                        key={index}
+                        controls
+                        className="w-full rounded-lg"
+                        src={url}
+                      >
+                        お使いのブラウザは動画再生に対応していません。
+                      </video>
+                    );
+                  } else {
+                    return (
+                      <img
+                        key={index}
+                        src={url}
+                        alt={`${post.title || "投稿"} - 画像 ${index + 1}`}
+                        className="w-full rounded-lg"
+                      />
+                    );
+                  }
+                })}
+              </div>
+            );
+          })()}
+
           {/* 投稿タイプバッジ */}
           {post.type === "paid" && (
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 text-sm font-medium">

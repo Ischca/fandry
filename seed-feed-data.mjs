@@ -302,6 +302,10 @@ for (const postData of postsData) {
     postType = 'membership';
   }
   
+  // ランダムなサンプル画像を追加（Unsplashのランダム画像）
+  const randomImageId = Math.floor(Math.random() * 1000);
+  const mediaUrls = JSON.stringify([`https://picsum.photos/seed/${creator.id}-${randomImageId}/800/600`]);
+  
   await db.insert(schema.posts).values({
     creatorId: creator.id,
     title: postData.title,
@@ -309,6 +313,7 @@ for (const postData of postsData) {
     type: postType,
     price: postData.price,
     membershipTier: postData.isMembership ? 1 : 0,
+    mediaUrls: mediaUrls,
     likeCount: Math.floor(Math.random() * 100) + 5,
     commentCount: Math.floor(Math.random() * 20),
   });

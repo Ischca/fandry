@@ -318,6 +318,8 @@ export async function getFollowingPosts(userId: number) {
       creatorId: posts.creatorId,
       title: posts.title,
       content: posts.content,
+      type: posts.type,
+      price: posts.price,
       mediaUrls: posts.mediaUrls,
       likeCount: posts.likeCount,
       commentCount: posts.commentCount,

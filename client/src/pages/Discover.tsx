@@ -24,7 +24,7 @@ export default function Discover() {
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
               <Heart className="h-6 w-6 text-primary fill-primary" />
-              <span className="font-bold text-xl">Cheer</span>
+              <span className="font-bold text-xl">Fandry</span>
             </div>
           </Link>
           <nav className="flex items-center gap-6">

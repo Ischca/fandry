@@ -24,7 +24,7 @@ export default function MyPage() {
         <div className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Heart className="h-6 w-6 text-primary fill-primary" />
-            <span className="text-xl font-bold">Cheer</span>
+            <span className="text-xl font-bold">Fandry</span>
           </Link>
           <nav className="flex items-center gap-4">
             <Link href="/feed">

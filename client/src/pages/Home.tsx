@@ -23,7 +23,7 @@ export default function Home() {
         <div className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Heart className="h-6 w-6 text-primary fill-primary" />
-            <span className="text-xl font-bold">Cheer</span>
+            <span className="text-xl font-bold">Fandry</span>
           </Link>
           <nav className="flex items-center gap-4">
             {isAuthenticated ? (
@@ -65,7 +65,7 @@ export default function Home() {
             <span className="text-primary">クリエイターを支える</span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground">
-            Cheerは、クリエイターとファンをつなぐパトロン型支援プラットフォームです。
+            Fandryは、クリエイターとファンをつなぐパトロン型支援プラットフォームです。
             <br />
             投げ銭、有料コンテンツ、月額支援で、好きなクリエイターを応援しよう。
           </p>
@@ -89,7 +89,7 @@ export default function Home() {
       {/* 特徴セクション */}
       <section className="container py-20 bg-muted/30">
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-3xl font-bold text-center mb-12">Cheerの特徴</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">Fandryの特徴</h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="space-y-4 text-center">
               <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -140,7 +140,7 @@ export default function Home() {
       {/* フッター */}
       <footer className="border-t py-8 bg-card/50">
         <div className="container text-center text-sm text-muted-foreground">
-          <p>&copy; 2024 Cheer. All rights reserved.</p>
+          <p>&copy; 2024 Fandry. All rights reserved.</p>
         </div>
       </footer>
     </div>

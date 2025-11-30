@@ -9,6 +9,7 @@ import CreatorPage from "./pages/CreatorPage";
 import Feed from "./pages/Feed";
 import Discover from "./pages/Discover";
 import MyPage from "./pages/MyPage";
+import PostDetail from "./pages/PostDetail";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path={"/discover"} component={Discover} />
       <Route path={"/my"} component={MyPage} />
       <Route path={"/creator/:username"} component={CreatorPage} />
+      <Route path={"/post/:id"} component={PostDetail} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

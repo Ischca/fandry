@@ -5,6 +5,8 @@ import {
   creators, InsertCreator,
   posts, InsertPost,
   subscriptionPlans,
+  subscriptions,
+  purchases,
   tips, InsertTip,
   follows,
   comments, InsertComment,
@@ -138,6 +140,83 @@ export async function getPostById(id: number) {
   if (!db) return undefined;
   const result = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+// Get post with access check
+export async function getPostWithAccess(postId: number, userId?: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  // Get post with creator info
+  const result = await db
+    .select({
+      id: posts.id,
+      creatorId: posts.creatorId,
+      title: posts.title,
+      content: posts.content,
+      type: posts.type,
+      price: posts.price,
+      membershipTier: posts.membershipTier,
+      mediaUrls: posts.mediaUrls,
+      likeCount: posts.likeCount,
+      commentCount: posts.commentCount,
+      viewCount: posts.viewCount,
+      createdAt: posts.createdAt,
+      creatorUsername: creators.username,
+      creatorDisplayName: creators.displayName,
+      creatorAvatarUrl: creators.avatarUrl,
+    })
+    .from(posts)
+    .leftJoin(creators, eq(posts.creatorId, creators.id))
+    .where(eq(posts.id, postId))
+    .limit(1);
+  
+  if (result.length === 0) return null;
+  
+  const post = result[0];
+  
+  // Check access rights
+  let hasAccess = false;
+  let isPurchased = false;
+  let isSubscribed = false;
+  
+  if (post.type === 'free') {
+    hasAccess = true;
+  } else if (userId) {
+    if (post.type === 'paid') {
+      // Check if user has purchased this post
+      const purchase = await db
+        .select()
+        .from(purchases)
+        .where(and(eq(purchases.userId, userId), eq(purchases.postId, postId)))
+        .limit(1);
+      isPurchased = purchase.length > 0;
+      hasAccess = isPurchased;
+    } else if (post.type === 'membership') {
+      // Check if user has active subscription
+      const subscription = await db
+        .select()
+        .from(subscriptions)
+        .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+        .where(
+          and(
+            eq(subscriptions.userId, userId),
+            eq(subscriptionPlans.creatorId, post.creatorId),
+            eq(subscriptions.status, 'active')
+          )
+        )
+        .limit(1);
+      isSubscribed = subscription.length > 0;
+      hasAccess = isSubscribed;
+    }
+  }
+  
+  return {
+    ...post,
+    hasAccess,
+    isPurchased,
+    isSubscribed,
+  };
 }
 
 export async function createPost(post: InsertPost) {

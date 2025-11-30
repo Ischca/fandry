@@ -146,9 +146,16 @@ const postsData = [
   },
   {
     creatorIndex: 0,
-    title: "制作過程の動画をアップしました",
+    title: "制作過程の動画をアップロードしました",
     content: "キャラクターデザインの制作過程を早送りでまとめた動画です。ラフから完成までの流れをご覧ください！",
     isPaid: false,
+    price: 0,
+  },
+  {
+    creatorIndex: 0,
+    title: "【会員限定】メイキング動画フルバージョン",
+    content: "キャラクターデザインの制作過程をフルバージョンで公開します。ラフから完成までの全工程を詳しく解説しています。会員限定コンテンツです。",
+    isMembership: true,
     price: 0,
   },
   // 花咲ハナの投稿
@@ -288,12 +295,20 @@ const postsData = [
 // 投稿を作成
 for (const postData of postsData) {
   const creator = createdCreators[postData.creatorIndex];
+  let postType = 'free';
+  if (postData.isPaid) {
+    postType = 'paid';
+  } else if (postData.isMembership) {
+    postType = 'membership';
+  }
+  
   await db.insert(schema.posts).values({
     creatorId: creator.id,
     title: postData.title,
     content: postData.content,
-    isPaid: postData.isPaid,
+    type: postType,
     price: postData.price,
+    membershipTier: postData.isMembership ? 1 : 0,
     likeCount: Math.floor(Math.random() * 100) + 5,
     commentCount: Math.floor(Math.random() * 20),
   });

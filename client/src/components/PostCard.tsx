@@ -55,13 +55,19 @@ export function PostCard({ post }: PostCardProps) {
         )}
 
         {/* Content */}
-        <div className="p-4 space-y-2">
-          {post.title && (
-            <h3 className="font-bold text-lg">{post.title || ""}</h3>
-          )}
-          <p className="text-sm text-muted-foreground line-clamp-3">
-            {post.content}
-          </p>
+        <Link href={`/post/${post.id}`}>
+          <div className="p-4 space-y-2 cursor-pointer hover:bg-accent/30 transition-colors">
+            {post.title && (
+              <h3 className="font-bold text-lg">{post.title || ""}</h3>
+            )}
+            <p className="text-sm text-muted-foreground line-clamp-3">
+              {post.content}
+            </p>
+          </div>
+        </Link>
+
+        {/* Actions and Timestamp */}
+        <div className="px-4 pb-4 space-y-2">
 
           {/* Actions */}
           <div className="flex items-center gap-4 pt-2">

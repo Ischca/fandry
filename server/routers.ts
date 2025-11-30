@@ -11,6 +11,7 @@ import {
   updateCreator,
   getPostsByCreatorId,
   getPostById,
+  getPostWithAccess,
   createPost,
   createTip,
   getTipsByCreatorId,
@@ -108,8 +109,9 @@ export const appRouter = router({
     
     getById: publicProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        const post = await getPostById(input.id);
+      .query(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        const post = await getPostWithAccess(input.id, userId);
         if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
         return post;
       }),

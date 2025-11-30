@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { PostCard } from "@/components/PostCard";
 import { Button } from "@/components/ui/button";
-import { Loader2, Heart } from "lucide-react";
+import { Loader2, Heart, PenSquare } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 
@@ -66,12 +66,18 @@ export default function Feed() {
               <span className="font-bold text-xl">Fandry</span>
             </div>
           </Link>
-          <nav className="flex items-center gap-6">
+          <nav className="flex items-center gap-4">
             <Link href="/feed">
               <span className="text-sm font-medium text-primary cursor-pointer">フィード</span>
             </Link>
             <Link href="/discover">
               <span className="text-sm font-medium hover:text-primary transition-colors cursor-pointer">発見</span>
+            </Link>
+            <Link href="/create-post">
+              <Button variant="outline" size="sm" className="gap-2">
+                <PenSquare className="h-4 w-4" />
+                投稿
+              </Button>
             </Link>
             <Link href="/my">
               <Button variant="default" size="sm">マイページ</Button>

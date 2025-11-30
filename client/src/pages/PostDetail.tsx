@@ -1,8 +1,9 @@
+import React from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Heart, MessageCircle, Lock, Crown } from "lucide-react";
+import { Heart, Lock, Crown, MessageCircle, Send } from "lucide-react";
 import { Link, useParams } from "wouter";
 
 
@@ -26,6 +27,27 @@ export default function PostDetail() {
     { creatorId: post?.creatorId || 0 },
     { enabled: post?.type === "membership" && !!post?.creatorId }
   );
+
+  // コメント取得
+  const { data: comments, refetch: refetchComments } = trpc.comment.getByPostId.useQuery(
+    { postId },
+    { enabled: postId > 0 }
+  );
+
+  // コメント投稿
+  const [commentContent, setCommentContent] = React.useState("");
+  const commentMutation = trpc.comment.create.useMutation({
+    onSuccess: () => {
+      setCommentContent("");
+      refetchComments();
+    },
+  });
+
+  const handleCommentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentContent.trim()) return;
+    commentMutation.mutate({ postId, content: commentContent });
+  };
 
   const likeMutation = trpc.like.toggle.useMutation({
     onSuccess: () => {
@@ -283,6 +305,63 @@ export default function PostDetail() {
             <div className="ml-auto text-sm text-muted-foreground">
               {new Date(post.createdAt).toLocaleDateString("ja-JP")}
             </div>
+          </div>
+        </Card>
+
+        {/* コメントセクション */}
+        <Card className="p-6 space-y-6">
+          <h2 className="text-xl font-bold">コメント ({post.commentCount})</h2>
+
+          {/* コメント投稿フォーム */}
+          {isAuthenticated ? (
+            <form onSubmit={handleCommentSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={commentContent}
+                onChange={(e) => setCommentContent(e.target.value)}
+                placeholder="コメントを入力..."
+                className="flex-1 px-4 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                maxLength={500}
+              />
+              <Button type="submit" disabled={!commentContent.trim() || commentMutation.isPending} size="icon">
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
+          ) : (
+            <div className="text-center py-4 text-muted-foreground">
+              <p>コメントするにはログインが必要です</p>
+              <Button className="mt-2" asChild>
+                <a href={`/api/oauth/login?redirect=${encodeURIComponent(window.location.pathname)}`}>
+                  ログイン
+                </a>
+              </Button>
+            </div>
+          )}
+
+          {/* コメント一覧 */}
+          <div className="space-y-4">
+            {comments && comments.length > 0 ? (
+              comments.map((comment) => (
+                <div key={comment.id} className="flex gap-3 p-4 rounded-lg bg-muted/30">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-sm font-medium">{comment.userDisplayName?.charAt(0) || "?"}</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{comment.userDisplayName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(comment.createdAt).toLocaleDateString("ja-JP")}
+                      </span>
+                    </div>
+                    <p className="text-sm">{comment.content}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-muted-foreground py-8">まだコメントがありません</p>
+            )}
           </div>
         </Card>
       </main>

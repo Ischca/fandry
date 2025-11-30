@@ -273,7 +273,21 @@ export async function isFollowing(userId: number, creatorId: number) {
 export async function getCommentsByPostId(postId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(comments).where(eq(comments.postId, postId)).orderBy(desc(comments.createdAt));
+  const result = await db
+    .select({
+      id: comments.id,
+      userId: comments.userId,
+      postId: comments.postId,
+      content: comments.content,
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+      userDisplayName: users.name,
+    })
+    .from(comments)
+    .leftJoin(users, eq(comments.userId, users.id))
+    .where(eq(comments.postId, postId))
+    .orderBy(desc(comments.createdAt));
+  return result;
 }
 
 export async function createComment(comment: InsertComment) {

@@ -392,6 +392,31 @@ for (const post of allPosts.slice(0, 5)) {
 }
 console.log("✅ Added likes to some posts");
 
+// いくつかの投稿にコメントを追加
+const commentTexts = [
+  "素晴らしい作品ですね！",
+  "次回作も楽しみにしています",
+  "とても参考になりました",
+  "応援しています！",
+  "感動しました",
+  "続きが気になります",
+  "クオリティが高いですね",
+  "ありがとうございます！",
+];
+
+for (const post of allPosts.slice(0, 8)) {
+  // 各投稿に1-3件のコメントを追加
+  const commentCount = Math.floor(Math.random() * 3) + 1;
+  for (let i = 0; i < commentCount; i++) {
+    await db.insert(schema.comments).values({
+      userId: currentUser.id,
+      postId: post.id,
+      content: commentTexts[Math.floor(Math.random() * commentTexts.length)],
+    });
+  }
+}
+console.log("✅ Added comments to some posts");
+
 console.log("🎉 Feed data seeding completed!");
 
 await connection.end();

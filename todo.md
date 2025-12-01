@@ -173,4 +173,11 @@
 ## プロジェクト内部のブランディング統一
 - [x] package.jsonの名前を「fandry」に変更
 - [x] todo.mdのタイトルを更新
-- [ ] 変更をコミットしてGitHubにプッシュ
+- [x] 変更をコミットしてGitHubにプッシュ
+
+## Railway + Neon + Cloudflare R2へのデプロイ
+- [x] Neon PostgreSQLデータベースの作成
+- [ ] Cloudflare R2バケットの作成
+- [ ] Railwayプロジェクトの作成とGitHub連携
+- [ ] 環境変数の設定
+- [ ] デプロイ実行と動作確認

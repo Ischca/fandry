@@ -1,7 +1,8 @@
-import { eq, and, or, desc, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import { 
-  InsertUser, users, 
+import { eq, and, or, desc, sql, ilike } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
+import {
+  InsertUser, users,
   creators, InsertCreator,
   posts, InsertPost,
   subscriptionPlans,
@@ -20,7 +21,8 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const client = neon(process.env.DATABASE_URL);
+      _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -79,7 +81,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -118,8 +121,8 @@ export async function getCreatorById(id: number) {
 export async function createCreator(creator: InsertCreator) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(creators).values(creator);
-  return result;
+  const result = await db.insert(creators).values(creator).returning({ id: creators.id });
+  return result[0];
 }
 
 export async function updateCreator(id: number, updates: Partial<InsertCreator>) {
@@ -146,7 +149,7 @@ export async function getPostById(id: number) {
 export async function getPostWithAccess(postId: number, userId?: number) {
   const db = await getDb();
   if (!db) return null;
-  
+
   // Get post with creator info
   const result = await db
     .select({
@@ -170,16 +173,16 @@ export async function getPostWithAccess(postId: number, userId?: number) {
     .leftJoin(creators, eq(posts.creatorId, creators.id))
     .where(eq(posts.id, postId))
     .limit(1);
-  
+
   if (result.length === 0) return null;
-  
+
   const post = result[0];
-  
+
   // Check access rights
   let hasAccess = false;
   let isPurchased = false;
   let isSubscribed = false;
-  
+
   if (post.type === 'free') {
     hasAccess = true;
   } else if (userId) {
@@ -210,7 +213,7 @@ export async function getPostWithAccess(postId: number, userId?: number) {
       hasAccess = isSubscribed;
     }
   }
-  
+
   return {
     ...post,
     hasAccess,
@@ -222,8 +225,8 @@ export async function getPostWithAccess(postId: number, userId?: number) {
 export async function createPost(post: InsertPost) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const [result] = await db.insert(posts).values(post);
-  return { id: result.insertId, ...post };
+  const result = await db.insert(posts).values(post).returning({ id: posts.id });
+  return { id: result[0].id, ...post };
 }
 
 // Subscription plan queries
@@ -237,8 +240,8 @@ export async function getSubscriptionPlansByCreatorId(creatorId: number) {
 export async function createTip(tip: InsertTip) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(tips).values(tip);
-  return result;
+  const result = await db.insert(tips).values(tip).returning({ id: tips.id });
+  return result[0];
 }
 
 export async function getTipsByCreatorId(creatorId: number, limit = 50) {
@@ -293,9 +296,9 @@ export async function getCommentsByPostId(postId: number) {
 export async function createComment(comment: InsertComment) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(comments).values(comment);
+  const result = await db.insert(comments).values(comment).returning({ id: comments.id });
   await db.update(posts).set({ commentCount: sql`${posts.commentCount} + 1` }).where(eq(posts.id, comment.postId));
-  return result;
+  return result[0];
 }
 
 // Like queries
@@ -324,7 +327,7 @@ export async function hasLiked(userId: number, postId: number) {
 export async function getFollowingPosts(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  
+
   // Get posts from creators that the user follows
   const result = await db
     .select({
@@ -351,51 +354,51 @@ export async function getFollowingPosts(userId: number) {
     .where(eq(follows.userId, userId))
     .orderBy(desc(posts.createdAt))
     .limit(50);
-  
+
   return result;
 }
 
 export async function getAllCreators(limit: number = 50) {
   const db = await getDb();
   if (!db) return [];
-  
+
   const result = await db
     .select()
     .from(creators)
     .orderBy(desc(creators.followerCount))
     .limit(limit);
-  
+
   return result;
 }
 
 export async function searchCreators(query: string, limit: number = 20) {
   const db = await getDb();
   if (!db) return [];
-  
+
   const result = await db
     .select()
     .from(creators)
     .where(
       or(
-        sql`${creators.username} LIKE ${`%${query}%`}`,
-        sql`${creators.displayName} LIKE ${`%${query}%`}`
+        ilike(creators.username, `%${query}%`),
+        ilike(creators.displayName, `%${query}%`)
       )
     )
     .limit(limit);
-  
+
   return result;
 }
 
 export async function getCreatorsByCategory(category: string, limit: number = 20) {
   const db = await getDb();
   if (!db) return [];
-  
+
   const result = await db
     .select()
     .from(creators)
     .where(eq(creators.category, category))
     .orderBy(desc(creators.followerCount))
     .limit(limit);
-  
+
   return result;
 }

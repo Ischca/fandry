@@ -1,20 +1,20 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { getLoginUrl } from "@/const";
+import { SignInButton, UserButton } from "@clerk/clerk-react";
 import { Heart, Sparkles, Users, Zap } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect } from "react";
 
 export default function Home() {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const [, setLocation] = useLocation();
 
   // ログイン済みユーザーはフィードページにリダイレクト
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!loading && isAuthenticated) {
       setLocation("/feed");
     }
-  }, [isAuthenticated, setLocation]);
+  }, [isAuthenticated, loading, setLocation]);
 
   return (
     <div className="min-h-screen">
@@ -37,15 +37,16 @@ export default function Home() {
                 <Link href="/my">
                   <Button variant="default">マイページ</Button>
                 </Link>
+                <UserButton afterSignOutUrl="/" />
               </>
             ) : (
               <>
                 <Link href="/discover">
                   <Button variant="ghost">クリエイターを探す</Button>
                 </Link>
-                <a href={getLoginUrl()}>
+                <SignInButton mode="modal">
                   <Button variant="default">ログイン</Button>
-                </a>
+                </SignInButton>
               </>
             )}
           </nav>
@@ -76,11 +77,11 @@ export default function Home() {
               </Button>
             </Link>
             {!isAuthenticated && (
-              <a href={getLoginUrl()}>
+              <SignInButton mode="modal">
                 <Button size="lg" variant="outline" className="text-lg px-8">
                   無料で始める
                 </Button>
-              </a>
+              </SignInButton>
             )}
           </div>
         </div>

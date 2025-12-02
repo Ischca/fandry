@@ -2,17 +2,44 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe } from "lucide-react";
+import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe, MoreHorizontal, Flag, Ban, Copy, Check, Link as LinkIcon } from "lucide-react";
 import { useParams, Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { TipDialog } from "@/components/TipDialog";
+import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { PostCard } from "@/components/PostCard";
+import { ReportDialog } from "@/components/ReportDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { useState } from "react";
 
 export default function CreatorPage() {
   const { username } = useParams<{ username: string }>();
   const { isAuthenticated } = useAuth();
   const [tipDialogOpen, setTipDialogOpen] = useState(false);
+  const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const tipUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/tip/${username}`
+    : "";
+
+  const handleCopyTipLink = async () => {
+    try {
+      await navigator.clipboard.writeText(tipUrl);
+      setCopied(true);
+      toast.success("チップリンクをコピーしました");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("コピーに失敗しました");
+    }
+  };
 
   const { data: creator, isLoading: creatorLoading } = trpc.creator.getByUsername.useQuery(
     { username: username || "" },
@@ -28,6 +55,33 @@ export default function CreatorPage() {
     { creatorId: creator?.id || 0 },
     { enabled: isAuthenticated && !!creator }
   );
+
+  // ブロック状態を取得（creatorのuserIdを使う）
+  const { data: blockData } = trpc.block.check.useQuery(
+    { userId: creator?.userId || 0 },
+    { enabled: isAuthenticated && !!creator }
+  );
+
+  const blockMutation = trpc.block.toggle.useMutation({
+    onSuccess: (result) => {
+      trpc.useUtils().block.check.invalidate({ userId: creator?.userId || 0 });
+      if (result.blocked) {
+        toast.success("ブロックしました");
+      } else {
+        toast.success("ブロックを解除しました");
+      }
+    },
+    onError: (error) => {
+      toast.error(`エラー: ${error.message}`);
+    },
+  });
+
+  const handleBlockToggle = () => {
+    if (!creator) return;
+    blockMutation.mutate({ userId: creator.userId });
+  };
+
+  const isBlocked = blockData?.blocked || false;
 
   const { data: plans, isLoading: plansLoading } = trpc.subscriptionPlan.getByCreatorId.useQuery(
     { creatorId: creator?.id || 0 },
@@ -160,12 +214,35 @@ export default function CreatorPage() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" size="icon">
-              <Share2 className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleCopyTipLink}>
+                  {copied ? (
+                    <Check className="h-4 w-4 mr-2 text-green-500" />
+                  ) : (
+                    <LinkIcon className="h-4 w-4 mr-2" />
+                  )}
+                  チップリンクをコピー
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast.success("ページリンクをコピーしました");
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  ページリンクをコピー
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {isAuthenticated ? (
               <>
-                <Button 
+                <Button
                   variant={isFollowing ? "default" : "outline"}
                   onClick={handleFollowToggle}
                   disabled={followMutation.isPending}
@@ -176,6 +253,29 @@ export default function CreatorPage() {
                   <Heart className="h-4 w-4" />
                   応援する
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={handleBlockToggle}
+                      disabled={blockMutation.isPending}
+                    >
+                      <Ban className="h-4 w-4 mr-2" />
+                      {isBlocked ? "ブロック解除" : "ブロック"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setReportDialogOpen(true)}
+                      className="text-destructive"
+                    >
+                      <Flag className="h-4 w-4 mr-2" />
+                      通報する
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : (
               <a href={getLoginUrl()}>
@@ -228,7 +328,7 @@ export default function CreatorPage() {
                       <p className="text-xs text-muted-foreground">
                         {plan.subscriberCount}人が加入中
                       </p>
-                      <Button size="sm" onClick={() => alert("決済機能は未実装です")}>
+                      <Button size="sm" onClick={() => setSubscribeDialogOpen(true)}>
                         加入
                       </Button>
                     </div>
@@ -267,12 +367,30 @@ export default function CreatorPage() {
       </div>
       
       {isAuthenticated && (
-        <TipDialog
-          open={tipDialogOpen}
-          onOpenChange={setTipDialogOpen}
-          creatorId={creator.id}
-          creatorName={creator.displayName}
-        />
+        <>
+          <TipDialog
+            open={tipDialogOpen}
+            onOpenChange={setTipDialogOpen}
+            creatorId={creator.id}
+            creatorName={creator.displayName}
+          />
+          {plans && plans.length > 0 && (
+            <SubscribeDialog
+              open={subscribeDialogOpen}
+              onOpenChange={setSubscribeDialogOpen}
+              plans={plans}
+              creatorId={creator.id}
+              creatorName={creator.displayName}
+            />
+          )}
+          <ReportDialog
+            open={reportDialogOpen}
+            onOpenChange={setReportDialogOpen}
+            targetType="creator"
+            targetId={creator.id}
+            targetName={creator.username}
+          />
+        </>
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { AgeVerification } from "./components/AgeVerification";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import CreatorPage from "./pages/CreatorPage";
@@ -11,6 +12,14 @@ import Discover from "./pages/Discover";
 import MyPage from "./pages/MyPage";
 import PostDetail from "./pages/PostDetail";
 import CreatePost from "./pages/CreatePost";
+import EditPost from "./pages/EditPost";
+import ManagePosts from "./pages/ManagePosts";
+import ManagePlans from "./pages/ManagePlans";
+import TipPage from "./pages/TipPage";
+import Ranking from "./pages/Ranking";
+import Dashboard from "./pages/Dashboard";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 
 function Router() {
   return (
@@ -20,8 +29,16 @@ function Router() {
       <Route path={"/discover"} component={Discover} />
       <Route path={"/my"} component={MyPage} />
       <Route path={"/creator/:username"} component={CreatorPage} />
+      <Route path={"/tip/:username"} component={TipPage} />
       <Route path={"/post/:id"} component={PostDetail} />
       <Route path={"/create-post"} component={CreatePost} />
+      <Route path={"/edit-post/:id"} component={EditPost} />
+      <Route path={"/manage-posts"} component={ManagePosts} />
+      <Route path={"/manage-plans"} component={ManagePlans} />
+      <Route path={"/ranking"} component={Ranking} />
+      <Route path={"/dashboard"} component={Dashboard} />
+      <Route path={"/terms"} component={Terms} />
+      <Route path={"/privacy"} component={Privacy} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
@@ -42,7 +59,9 @@ function App() {
       >
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <AgeVerification>
+            <Router />
+          </AgeVerification>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

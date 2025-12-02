@@ -1,10 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Heart, Lock, Crown, MessageCircle, Send } from "lucide-react";
+import { Heart, Lock, Crown, MessageCircle, Send, MoreHorizontal, Flag } from "lucide-react";
 import { Link, useParams } from "wouter";
+import { PurchaseDialog } from "@/components/PurchaseDialog";
+import { SubscribeDialog } from "@/components/SubscribeDialog";
+import { ReportDialog } from "@/components/ReportDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 export default function PostDetail() {
@@ -65,12 +74,26 @@ export default function PostDetail() {
     likeMutation.mutate({ postId });
   };
 
+  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
+  const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+
   const handlePurchase = () => {
-    alert("決済機能は現在準備中です。");
+    setPurchaseDialogOpen(true);
   };
 
   const handleSubscribe = () => {
-    alert("月額支援機能は現在準備中です。");
+    setSubscribeDialogOpen(true);
+  };
+
+  const handlePurchaseSuccess = () => {
+    // Refresh post data to update access
+    trpc.useUtils().post.getById.invalidate({ id: postId });
+  };
+
+  const handleSubscribeSuccess = () => {
+    // Refresh post data to update access
+    trpc.useUtils().post.getById.invalidate({ id: postId });
   };
 
   const isLiked = likeData?.liked || false;
@@ -302,8 +325,26 @@ export default function PostDetail() {
               <MessageCircle className="h-4 w-4" />
               <span>{post.commentCount}</span>
             </Button>
-            <div className="ml-auto text-sm text-muted-foreground">
-              {new Date(post.createdAt).toLocaleDateString("ja-JP")}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {new Date(post.createdAt).toLocaleDateString("ja-JP")}
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => setReportDialogOpen(true)}
+                    className="text-destructive"
+                  >
+                    <Flag className="h-4 w-4 mr-2" />
+                    通報する
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </Card>
@@ -365,6 +406,42 @@ export default function PostDetail() {
           </div>
         </Card>
       </main>
+
+      {/* Purchase Dialog */}
+      {post && post.type === "paid" && (
+        <PurchaseDialog
+          open={purchaseDialogOpen}
+          onOpenChange={setPurchaseDialogOpen}
+          postId={post.id}
+          postTitle={post.title}
+          price={post.price || 0}
+          creatorName={post.creatorDisplayName || "クリエイター"}
+          onSuccess={handlePurchaseSuccess}
+        />
+      )}
+
+      {/* Subscribe Dialog */}
+      {post && post.type === "membership" && plans && (
+        <SubscribeDialog
+          open={subscribeDialogOpen}
+          onOpenChange={setSubscribeDialogOpen}
+          plans={plans}
+          creatorId={post.creatorId}
+          creatorName={post.creatorDisplayName || "クリエイター"}
+          requiredTier={post.membershipTier || undefined}
+          onSuccess={handleSubscribeSuccess}
+        />
+      )}
+
+      {/* Report Dialog */}
+      {post && (
+        <ReportDialog
+          open={reportDialogOpen}
+          onOpenChange={setReportDialogOpen}
+          targetType="post"
+          targetId={post.id}
+        />
+      )}
     </div>
   );
 }

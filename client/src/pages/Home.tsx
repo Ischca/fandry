@@ -140,8 +140,20 @@ export default function Home() {
 
       {/* フッター */}
       <footer className="border-t py-8 bg-card/50">
-        <div className="container text-center text-sm text-muted-foreground">
-          <p>&copy; 2024 Fandry. All rights reserved.</p>
+        <div className="container">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              &copy; 2024 Fandry. All rights reserved.
+            </p>
+            <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+              <Link href="/terms" className="hover:text-foreground transition-colors">
+                利用規約
+              </Link>
+              <Link href="/privacy" className="hover:text-foreground transition-colors">
+                プライバシーポリシー
+              </Link>
+            </nav>
+          </div>
         </div>
       </footer>
     </div>

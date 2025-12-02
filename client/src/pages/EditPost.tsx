@@ -3,8 +3,11 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { MediaUploader } from "@/components/MediaUploader";
+import { toast } from "sonner";
+import { Heart } from "lucide-react";
+import { Link } from "wouter";
 
 interface UploadedMedia {
   id?: number;
@@ -15,7 +18,9 @@ interface UploadedMedia {
   size: number;
 }
 
-export default function CreatePost() {
+export default function EditPost() {
+  const { id } = useParams<{ id: string }>();
+  const postId = parseInt(id || "0");
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -27,14 +32,55 @@ export default function CreatePost() {
   const [uploadedMedia, setUploadedMedia] = React.useState<UploadedMedia[]>([]);
   const [useUrlInput, setUseUrlInput] = React.useState(false);
   const [mediaUrls, setMediaUrls] = React.useState("");
+  const [isLoaded, setIsLoaded] = React.useState(false);
 
-  const createMutation = trpc.post.create.useMutation({
+  // Fetch post data
+  const { data: post, isLoading } = trpc.post.getById.useQuery(
+    { id: postId },
+    { enabled: postId > 0 }
+  );
+
+  // Initialize form with post data
+  React.useEffect(() => {
+    if (post && !isLoaded) {
+      setTitle(post.title || "");
+      setContent(post.content || "");
+      setType(post.type as "free" | "paid" | "membership");
+      setPrice(post.price?.toString() || "");
+      setMembershipTier(post.membershipTier?.toString() || "1");
+
+      // Parse media URLs
+      if (post.mediaUrls) {
+        try {
+          const urls = JSON.parse(post.mediaUrls);
+          if (Array.isArray(urls) && urls.length > 0) {
+            // Convert URLs to UploadedMedia format for display
+            const media = urls.map((url: string, index: number) => ({
+              url,
+              key: `existing-${index}`,
+              type: url.match(/\.(mp4|webm|mov)$/i) ? "video" : "image" as "image" | "video",
+              mimeType: "unknown",
+              size: 0,
+            }));
+            setUploadedMedia(media);
+          }
+        } catch {
+          setMediaUrls(post.mediaUrls);
+          setUseUrlInput(true);
+        }
+      }
+
+      setIsLoaded(true);
+    }
+  }, [post, isLoaded]);
+
+  const updateMutation = trpc.post.update.useMutation({
     onSuccess: () => {
-      alert("投稿を作成しました！");
-      setLocation("/feed");
+      toast.success("投稿を更新しました");
+      setLocation("/manage-posts");
     },
     onError: (error) => {
-      alert(`エラー: ${error.message}`);
+      toast.error(`更新に失敗しました: ${error.message}`);
     },
   });
 
@@ -42,13 +88,15 @@ export default function CreatePost() {
     e.preventDefault();
 
     const postData: {
+      id: number;
       title?: string;
-      content: string;
-      type: "free" | "paid" | "membership";
+      content?: string;
+      type?: "free" | "paid" | "membership";
       price?: number;
       membershipTier?: number;
       mediaUrls?: string;
     } = {
+      id: postId,
       content,
       type,
     };
@@ -61,14 +109,13 @@ export default function CreatePost() {
     if (uploadedMedia.length > 0) {
       postData.mediaUrls = JSON.stringify(uploadedMedia.map(m => m.url));
     } else if (mediaUrls) {
-      // Convert comma-separated URLs to JSON array
       const urls = mediaUrls.split(",").map(url => url.trim()).filter(url => url);
       if (urls.length > 0) {
         postData.mediaUrls = JSON.stringify(urls);
       }
     }
 
-    createMutation.mutate(postData);
+    updateMutation.mutate(postData);
   };
 
   if (!isAuthenticated) {
@@ -76,9 +123,30 @@ export default function CreatePost() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="p-8 text-center">
           <h2 className="text-2xl font-bold mb-4">ログインが必要です</h2>
-          <p className="text-muted-foreground mb-4">投稿を作成するにはログインしてください</p>
+          <p className="text-muted-foreground mb-4">投稿を編集するにはログインしてください</p>
           <Button asChild>
-            <a href="/api/oauth/login?redirect=/create-post">ログイン</a>
+            <a href={`/api/oauth/login?redirect=/edit-post/${postId}`}>ログイン</a>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">読み込み中...</p>
+      </div>
+    );
+  }
+
+  if (!post) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="p-8 text-center">
+          <h2 className="text-2xl font-bold mb-4">投稿が見つかりません</h2>
+          <Button onClick={() => setLocation("/manage-posts")}>
+            投稿管理に戻る
           </Button>
         </Card>
       </div>
@@ -89,8 +157,15 @@ export default function CreatePost() {
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
         <div className="container flex items-center justify-between h-16">
-          <h1 className="text-2xl font-bold">新規投稿</h1>
-          <Button variant="outline" onClick={() => setLocation("/feed")}>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="flex items-center gap-2">
+              <Heart className="h-6 w-6 text-primary fill-primary" />
+              <span className="text-xl font-bold">Fandry</span>
+            </Link>
+            <span className="text-muted-foreground">/</span>
+            <h1 className="text-lg font-semibold">投稿を編集</h1>
+          </div>
+          <Button variant="outline" onClick={() => setLocation("/manage-posts")}>
             キャンセル
           </Button>
         </div>
@@ -155,7 +230,7 @@ export default function CreatePost() {
                   value={uploadedMedia}
                   onChange={setUploadedMedia}
                   maxFiles={10}
-                  disabled={createMutation.isPending}
+                  disabled={updateMutation.isPending}
                 />
               )}
             </div>
@@ -245,15 +320,15 @@ export default function CreatePost() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setLocation("/feed")}
+              onClick={() => setLocation("/manage-posts")}
             >
               キャンセル
             </Button>
             <Button
               type="submit"
-              disabled={!content || createMutation.isPending}
+              disabled={!content || updateMutation.isPending}
             >
-              {createMutation.isPending ? "投稿中..." : "投稿する"}
+              {updateMutation.isPending ? "更新中..." : "更新する"}
             </Button>
           </div>
         </form>

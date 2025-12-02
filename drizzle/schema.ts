@@ -184,3 +184,70 @@ export const likes = pgTable("likes", {
 
 export type Like = typeof likes.$inferSelect;
 export type InsertLike = typeof likes.$inferInsert;
+
+/**
+ * Media table - アップロードされたメディアファイル
+ */
+export const media = pgTable("media", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  key: varchar("key", { length: 512 }).notNull().unique(), // R2 object key
+  url: text("url").notNull(),
+  type: varchar("type", { length: 32 }).notNull(), // image/video
+  mimeType: varchar("mime_type", { length: 128 }).notNull(),
+  size: integer("size").notNull(), // bytes
+  width: integer("width"),
+  height: integer("height"),
+  duration: integer("duration"), // video duration in seconds
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Media = typeof media.$inferSelect;
+export type InsertMedia = typeof media.$inferInsert;
+
+/**
+ * Reports table - 通報
+ */
+export const reportTypeEnum = pgEnum("report_type", [
+  "spam",
+  "harassment",
+  "inappropriate_content",
+  "copyright",
+  "other",
+]);
+
+export const reportStatusEnum = pgEnum("report_status", [
+  "pending",
+  "reviewed",
+  "resolved",
+  "dismissed",
+]);
+
+export const reports = pgTable("reports", {
+  id: serial("id").primaryKey(),
+  reporterId: integer("reporter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  targetType: varchar("target_type", { length: 32 }).notNull(), // "post" | "creator" | "comment"
+  targetId: integer("target_id").notNull(),
+  type: reportTypeEnum("type").notNull(),
+  reason: text("reason"),
+  status: reportStatusEnum("status").default("pending").notNull(),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: integer("reviewed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Report = typeof reports.$inferSelect;
+export type InsertReport = typeof reports.$inferInsert;
+
+/**
+ * Blocks table - ブロック
+ */
+export const blocks = pgTable("blocks", {
+  id: serial("id").primaryKey(),
+  blockerId: integer("blocker_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  blockedId: integer("blocked_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Block = typeof blocks.$inferSelect;
+export type InsertBlock = typeof blocks.$inferInsert;

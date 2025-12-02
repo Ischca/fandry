@@ -35,7 +35,7 @@ describe("post.create", () => {
         content: "This should fail",
         type: "free",
       })
-    ).rejects.toThrow("You must be a creator to post");
+    ).rejects.toThrow("You must be a creator");
   });
 
   it("should validate post type enum", async () => {

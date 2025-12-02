@@ -8,6 +8,20 @@
       "when": 1764592576211,
       "tag": "0000_natural_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764676298887,
+      "tag": "0001_wide_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764676582571,
+      "tag": "0002_solid_vanisher",
+      "breakpoints": true
     }
   ]
 }

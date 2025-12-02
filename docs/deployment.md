@@ -8,7 +8,8 @@
 - Neonアカウント
 - Cloudflareアカウント
 - Railwayアカウント
-- Stripeアカウント
+- Clerkアカウント（認証）
+- Segpayアカウント（決済）
 
 ### 1. Neon PostgreSQLのセットアップ
 
@@ -32,18 +33,32 @@
    - 権限: Read & Write
    - アクセスキーIDとシークレットアクセスキーをコピー
 
-### 3. Stripeのセットアップ
+### 3. Clerkのセットアップ
 
-1. [Stripe Dashboard](https://dashboard.stripe.com/) にアクセス
-2. APIキーを取得
-   - Publishable key
-   - Secret key
-3. Webhookを設定
-   - エンドポイント: `https://your-app.railway.app/api/stripe/webhook`
-   - イベント: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
-   - Webhook署名シークレットをコピー
+1. [Clerk Dashboard](https://dashboard.clerk.com/) にアクセス
+2. 新しいアプリケーションを作成
+3. APIキーを取得
+   - Publishable key（フロントエンド用）
+   - Secret key（バックエンド用）
+4. サインイン方法を設定（Email、OAuth等）
 
-### 4. Railwayへのデプロイ
+### 4. Segpayのセットアップ（決済）
+
+1. [Segpay](https://segpay.com/become-a-client/) にアカウント申請
+2. 審査通過後、Merchant Portalにアクセス
+3. Package IDとPrice Pointを設定
+4. One-Click機能を有効化
+5. Webhook URLを設定
+   - エンドポイント: `https://your-app.railway.app/api/segpay/webhook`
+6. IPホワイトリストにサーバーIPを登録
+
+**Segpayの特徴:**
+- アダルトコンテンツ対応
+- 日本語決済ページ（`&paypagelanguage=JA`）
+- 日本円（JPY）対応
+- One-Click Service APIで2回目以降の決済はワンクリック
+
+### 5. Railwayへのデプロイ
 
 1. [Railway](https://railway.app/) にアクセス
 2. GitHubアカウントでログイン
@@ -56,15 +71,12 @@
 
 ```env
 # データベース
-DATABASE_URL=postgresql://neondb_owner:...@ep-summer-morning-a1xui7l9-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=postgresql://neondb_owner:...@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 
-# 認証（Manusから提供される）
-JWT_SECRET=your-jwt-secret
-OAUTH_SERVER_URL=https://api.manus.im
-VITE_OAUTH_PORTAL_URL=https://auth.manus.im
-VITE_APP_ID=your-app-id
-OWNER_OPEN_ID=your-owner-open-id
-OWNER_NAME=your-owner-name
+# 認証（Clerk）
+CLERK_PUBLISHABLE_KEY=pk_live_...
+CLERK_SECRET_KEY=sk_live_...
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_...  # フロントエンド用（CLERK_PUBLISHABLE_KEYと同じ値）
 
 # ストレージ（Cloudflare R2）
 S3_ENDPOINT=https://[account-id].r2.cloudflarestorage.com
@@ -73,10 +85,9 @@ S3_SECRET_ACCESS_KEY=your-r2-secret-access-key
 S3_BUCKET=fandry-storage
 S3_REGION=auto
 
-# 決済（Stripe）
-STRIPE_SECRET_KEY=sk_live_...
-VITE_STRIPE_PUBLISHABLE_KEY=pk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# 決済（Segpay）- 審査通過後に設定
+SEGPAY_PACKAGE_ID=your-package-id
+SEGPAY_API_KEY=your-api-key
 
 # その他
 NODE_ENV=production
@@ -87,7 +98,7 @@ PORT=3000
    - Railwayが自動的にビルドとデプロイを開始
    - デプロイ完了後、URLが発行される
 
-### 5. デプロイ後の確認
+### 6. デプロイ後の確認
 
 1. アプリケーションURLにアクセス
 2. ログイン機能をテスト
@@ -111,9 +122,10 @@ PORT=3000
 
 #### 決済エラー
 
-- Stripeのシークレットキーが正しいか確認
-- Webhookエンドポイントが正しく設定されているか確認
-- Webhook署名シークレットが正しいか確認
+- SegpayのAPIキーが正しいか確認
+- WebhookエンドポイントURLが正しく設定されているか確認
+- サーバーIPがSegpayでホワイトリスト登録されているか確認
+- One-Click機能がPrice Pointで有効になっているか確認
 
 ### スケーリング
 
@@ -121,7 +133,7 @@ Railwayは自動的にスケーリングしますが、以下の点に注意：
 
 - データベース接続数の上限（Neon Free: 100接続）
 - R2のストレージ容量（無料枠: 10GB）
-- Stripeの決済手数料
+- Segpayの決済手数料（10-15%）
 
 ### バックアップ
 
@@ -132,8 +144,9 @@ Railwayは自動的にスケーリングしますが、以下の点に注意：
 ### モニタリング
 
 - Railwayのログを定期的に確認
-- Stripeのダッシュボードで決済状況を確認
+- Segpay Merchant Portalで決済状況を確認
 - Neonのダッシュボードでデータベースのパフォーマンスを確認
+- Clerkダッシュボードでユーザー認証状況を確認
 
 ## 代替構成
 

@@ -32,7 +32,7 @@
 - [ ] 通知システム
 
 ## フェーズ5: 決済統合
-- [ ] Stripe統合
+- [ ] Segpay統合（フェーズ10で実装）
 - [ ] 決済フロー実装
 - [ ] 振込申請機能
 - [ ] 領収書発行機能
@@ -177,7 +177,29 @@
 
 ## Railway + Neon + Cloudflare R2へのデプロイ
 - [x] Neon PostgreSQLデータベースの作成
-- [ ] Cloudflare R2バケットの作成
-- [ ] Railwayプロジェクトの作成とGitHub連携
-- [ ] 環境変数の設定
-- [ ] デプロイ実行と動作確認
+- [x] Drizzle ORM PostgreSQL移行（MySQL → PostgreSQL）
+- [x] Cloudflare R2バケットの作成
+- [x] Railwayプロジェクトの作成とGitHub連携
+- [x] 環境変数の設定
+- [x] デプロイ実行と動作確認
+- [x] Clerk認証への移行（Manus OAuth → Clerk）
+- [ ] カスタムドメイン（fndry.app）の設定（DNS反映待ち）
+
+## フェーズ10: Segpay決済統合
+- [ ] Segpayアカウント申請
+- [ ] 審査通過後、Sandbox環境でテスト
+- [ ] 決済フローUI/UX設計
+  - [ ] 初回決済ページ（カード登録）
+  - [ ] ワンクリック投げ銭UI
+  - [ ] 有料コンテンツ購入フロー
+  - [ ] メンバーシップ加入フロー
+- [ ] Segpay One-Click Service API連携
+  - [ ] OCToken（カードトークン）管理
+  - [ ] 投げ銭API実装
+  - [ ] 単品購入API実装
+  - [ ] サブスクリプションAPI実装
+- [ ] Webhook処理の実装
+  - [ ] 決済完了通知
+  - [ ] サブスクリプション更新通知
+  - [ ] 決済失敗通知
+- [ ] 本番環境での決済テスト

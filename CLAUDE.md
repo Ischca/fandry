@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Fandry is a patron-style fan site platform (similar to Patreon/Fanbox) built with React + tRPC + Drizzle ORM. It enables creators to build fan communities with free/paid/membership-only posts and Stripe-based subscriptions.
+Fandry is an adult content creator platform (similar to Fantia/Fanbox) built with React + tRPC + Drizzle ORM. It enables creators to build fan communities with free/paid/membership-only posts and Segpay-based payments.
+
+**Key Features**:
+- ワンクリック投げ銭（One-click tipping）
+- 有料コンテンツ販売
+- メンバーシップ（月額サブスクリプション）
+- パトロンバッジ（累計支援額に応じたバッジ）
 
 ## Commands
 
@@ -39,10 +45,10 @@ client/               # React frontend (Vite)
 server/               # Express + tRPC backend
 ├── routers.ts        # All tRPC procedures (appRouter)
 ├── db.ts             # Database query helpers
-└── _core/            # Framework internals (auth, tRPC setup, OAuth)
+└── _core/            # Framework internals (auth, tRPC setup)
     ├── trpc.ts       # publicProcedure, protectedProcedure, adminProcedure
-    ├── context.ts    # Request context with user
-    └── oauth.ts      # Manus OAuth integration
+    ├── context.ts    # Request context with Clerk auth
+    └── index.ts      # Express server setup
 
 drizzle/
 └── schema.ts         # All table definitions (users, creators, posts, etc.)
@@ -56,14 +62,19 @@ shared/               # Shared types and constants
 **tRPC Integration**: Frontend uses `@/lib/trpc.ts` which imports `AppRouter` type from `server/routers.ts`. All API calls are type-safe end-to-end.
 
 **Database Flow**:
-1. Define tables in `drizzle/schema.ts` (uses MySQL dialect with Neon PostgreSQL)
+1. Define tables in `drizzle/schema.ts` (PostgreSQL with Neon serverless)
 2. Add query helpers in `server/db.ts` (e.g., `getCreatorByUsername`, `createPost`)
 3. Create tRPC procedures in `server/routers.ts`
 
-**Authentication**: Uses Manus OAuth. Three procedure types:
+**Authentication**: Uses Clerk. Three procedure types:
 - `publicProcedure` - No auth required
 - `protectedProcedure` - Requires logged-in user
 - `adminProcedure` - Requires admin role
+
+**Payment Processing**: Uses Segpay (adult content compatible)
+- One-Click Service API for repeat purchases (no redirect)
+- Initial purchase requires Segpay hosted payment page
+- OCToken stored per user for subsequent transactions
 
 **Path Aliases**:
 - `@/*` → `./client/src/*`
@@ -87,5 +98,19 @@ pnpm vitest run server/creator.test.ts
 
 ## Environment Variables
 
-Required: `DATABASE_URL`, `JWT_SECRET`, `OAUTH_SERVER_URL`
-Optional: S3/R2 storage (`S3_ENDPOINT`, etc.), Stripe (`STRIPE_SECRET_KEY`, etc.)
+**Required**:
+- `DATABASE_URL` - Neon PostgreSQL connection string
+- `CLERK_PUBLISHABLE_KEY` - Clerk frontend key
+- `CLERK_SECRET_KEY` - Clerk backend key
+- `VITE_CLERK_PUBLISHABLE_KEY` - Clerk key for Vite (same as CLERK_PUBLISHABLE_KEY)
+
+**Optional**:
+- S3/R2 storage: `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`
+- Segpay: `SEGPAY_PACKAGE_ID`, `SEGPAY_API_KEY` (after approval)
+
+## Deployment
+
+- **Hosting**: Railway
+- **Database**: Neon PostgreSQL
+- **Storage**: Cloudflare R2
+- **Domain**: fndry.app (via Cloudflare DNS)

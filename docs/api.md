@@ -8,6 +8,8 @@ FandryはtRPCを使用しているため、型安全なAPIを提供します。
 
 ## 認証
 
+認証にはClerkを使用しています。フロントエンドでClerkのトークンを取得し、`Authorization: Bearer <token>` ヘッダーで送信します。
+
 ### auth.me
 
 現在のユーザー情報を取得
@@ -233,26 +235,50 @@ trpc.follow.getFollowers.useQuery({ creatorId: number })
 trpc.follow.getFollowing.useQuery({ userId: number })
 ```
 
-## 決済
+## 決済（Segpay）
 
-### payment.createCheckoutSession
+決済にはSegpayを使用しています。初回決済時はSegpayの決済ページにリダイレクトし、2回目以降はOne-Click Service APIでワンクリック決済が可能です。
 
-Stripe Checkoutセッションを作成
+### payment.createCheckoutUrl
+
+Segpay決済ページURLを生成
 
 **リクエスト:**
 ```typescript
-trpc.payment.createCheckoutSession.useMutation({
-  type: 'subscription' | 'one_time';
-  planId?: number;  // type='subscription'の場合必須
-  postId?: number;  // type='one_time'の場合必須
+trpc.payment.createCheckoutUrl.useMutation({
+  type: 'tip' | 'purchase' | 'subscription';
+  amount?: number;      // type='tip'の場合
+  postId?: number;      // type='purchase'の場合
+  planId?: number;      // type='subscription'の場合
 })
 ```
 
 **レスポンス:**
 ```typescript
 {
-  sessionId: string;
-  url: string;
+  url: string;  // Segpay決済ページURL（&paypagelanguage=JA付き）
+}
+```
+
+### payment.oneClickCharge
+
+ワンクリック決済（2回目以降、OCToken保持ユーザー向け）
+
+**リクエスト:**
+```typescript
+trpc.payment.oneClickCharge.useMutation({
+  type: 'tip' | 'purchase';
+  amount?: number;      // type='tip'の場合
+  postId?: number;      // type='purchase'の場合
+  creatorId: number;
+})
+```
+
+**レスポンス:**
+```typescript
+{
+  success: boolean;
+  transactionId: string;
 }
 ```
 
@@ -300,15 +326,22 @@ tRPCは以下のエラーコードを返します：
 
 ## Webhooks
 
-### Stripe Webhook
+### Segpay Webhook
 
-エンドポイント: `/api/stripe/webhook`
+エンドポイント: `/api/segpay/webhook`
 
 処理されるイベント:
-- `checkout.session.completed`: 決済完了
-- `customer.subscription.created`: サブスクリプション作成
-- `customer.subscription.updated`: サブスクリプション更新
-- `customer.subscription.deleted`: サブスクリプション削除
+- 決済完了通知（Initial/Rebill）
+- サブスクリプション更新通知
+- サブスクリプションキャンセル通知
+- 決済失敗通知
+- チャージバック通知
+
+**Webhook処理の流れ:**
+1. Segpayから決済完了通知を受信
+2. `purchaseID`（OCToken）をユーザーに紐付けて保存
+3. 該当するコンテンツへのアクセス権を付与
+4. 2回目以降の決済はOCTokenを使用したワンクリック決済が可能に
 
 ## 型定義
 

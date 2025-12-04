@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { PostCard } from "@/components/PostCard";
+import { PointBalance } from "@/components/PointBalance";
 import { Button } from "@/components/ui/button";
 import { Loader2, Heart, PenSquare } from "lucide-react";
 import { Link } from "wouter";
@@ -79,6 +80,7 @@ export default function Feed() {
                 投稿
               </Button>
             </Link>
+            <PointBalance />
             <Link href="/my">
               <Button variant="default" size="sm">マイページ</Button>
             </Link>

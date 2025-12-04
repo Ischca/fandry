@@ -13,3 +13,6 @@ export { uploadRouter } from "./upload";
 export { reportRouter } from "./report";
 export { blockRouter } from "./block";
 export { revenueRouter } from "./revenue";
+export { pointRouter } from "./point";
+export { purchaseRouter } from "./purchase";
+export { subscriptionRouter } from "./subscription";

@@ -20,6 +20,7 @@ import Ranking from "./pages/Ranking";
 import Dashboard from "./pages/Dashboard";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import PointPurchase from "./pages/PointPurchase";
 
 function Router() {
   return (
@@ -37,6 +38,7 @@ function Router() {
       <Route path={"/manage-plans"} component={ManagePlans} />
       <Route path={"/ranking"} component={Ranking} />
       <Route path={"/dashboard"} component={Dashboard} />
+      <Route path={"/points"} component={PointPurchase} />
       <Route path={"/terms"} component={Terms} />
       <Route path={"/privacy"} component={Privacy} />
       <Route path={"/404"} component={NotFound} />

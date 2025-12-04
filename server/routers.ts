@@ -15,6 +15,9 @@ import {
   reportRouter,
   blockRouter,
   revenueRouter,
+  pointRouter,
+  purchaseRouter,
+  subscriptionRouter,
 } from "./routers/index";
 
 export const appRouter = router({
@@ -37,6 +40,9 @@ export const appRouter = router({
   upload: uploadRouter,
   report: reportRouter,
   block: blockRouter,
+  point: pointRouter,
+  purchase: purchaseRouter,
+  subscription: subscriptionRouter,
 });
 
 export type AppRouter = typeof appRouter;

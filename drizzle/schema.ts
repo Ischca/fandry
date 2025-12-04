@@ -4,6 +4,14 @@ import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "driz
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const postTypeEnum = pgEnum("post_type", ["free", "paid", "membership"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "cancelled", "expired"]);
+export const pointTransactionTypeEnum = pgEnum("point_transaction_type", [
+  "purchase",      // ポイント購入
+  "refund",        // 返金
+  "post_purchase", // 有料投稿購入
+  "subscription",  // サブスク支払い
+  "tip",           // チップ
+  "admin_grant",   // 管理者付与
+]);
 
 /**
  * Core user table backing auth flow.
@@ -43,6 +51,7 @@ export const creators = pgTable("creators", {
   coverUrl: text("cover_url"),
   category: varchar("category", { length: 64 }),
   socialLinks: text("social_links"), // JSON string
+  isAdult: integer("is_adult").default(0).notNull(), // アダルトクリエイター
   totalSupport: integer("total_support").default(0).notNull(), // 累計支援額（円）
   followerCount: integer("follower_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -64,6 +73,7 @@ export const posts = pgTable("posts", {
   price: integer("price").default(0), // 価格（円）
   membershipTier: integer("membership_tier").default(0), // 必要な会員ランク
   mediaUrls: text("media_urls"), // JSON array of URLs
+  isAdult: integer("is_adult").default(0).notNull(), // アダルトコンテンツ
   isPinned: integer("is_pinned").default(0).notNull(), // boolean as int
   likeCount: integer("like_count").default(0).notNull(),
   commentCount: integer("comment_count").default(0).notNull(),
@@ -86,6 +96,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   price: integer("price").notNull(), // 月額料金（円）
   tier: integer("tier").notNull(), // ランク（1, 2, 3...）
   benefits: text("benefits"), // JSON array of benefits
+  isAdult: integer("is_adult").default(0).notNull(), // アダルトプラン
   isActive: integer("is_active").default(1).notNull(),
   subscriberCount: integer("subscriber_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -103,6 +114,10 @@ export const subscriptions = pgTable("subscriptions", {
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   planId: integer("plan_id").notNull().references(() => subscriptionPlans.id, { onDelete: "cascade" }),
   status: subscriptionStatusEnum("status").default("active").notNull(),
+  paymentMethod: varchar("payment_method", { length: 16 }), // "points" | "stripe"
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
+  lastPointDeductAt: timestamp("last_point_deduct_at"),
+  pointDeductFailedAt: timestamp("point_deduct_failed_at"), // 猶予期間開始
   startedAt: timestamp("started_at").defaultNow().notNull(),
   nextBillingAt: timestamp("next_billing_at"),
   cancelledAt: timestamp("cancelled_at"),
@@ -123,6 +138,10 @@ export const tips = pgTable("tips", {
   amount: integer("amount").notNull(), // 金額（円）
   message: text("message"),
   isRecurring: integer("is_recurring").default(0).notNull(), // 定期投げ銭かどうか
+  paymentMethod: varchar("payment_method", { length: 16 }), // "points" | "stripe" | "hybrid"
+  pointsUsed: integer("points_used").default(0),
+  stripeAmount: integer("stripe_amount").default(0),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -137,6 +156,10 @@ export const purchases = pgTable("purchases", {
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   postId: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
   amount: integer("amount").notNull(),
+  paymentMethod: varchar("payment_method", { length: 16 }), // "points" | "stripe" | "hybrid"
+  pointsUsed: integer("points_used").default(0),
+  stripeAmount: integer("stripe_amount").default(0),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -251,3 +274,54 @@ export const blocks = pgTable("blocks", {
 
 export type Block = typeof blocks.$inferSelect;
 export type InsertBlock = typeof blocks.$inferInsert;
+
+/**
+ * User Points table - ユーザーのポイント残高
+ */
+export const userPoints = pgTable("user_points", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  balance: integer("balance").default(0).notNull(),
+  totalPurchased: integer("total_purchased").default(0).notNull(), // 累計購入ポイント
+  totalSpent: integer("total_spent").default(0).notNull(), // 累計消費ポイント
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type UserPoint = typeof userPoints.$inferSelect;
+export type InsertUserPoint = typeof userPoints.$inferInsert;
+
+/**
+ * Point Transactions table - ポイント取引履歴
+ */
+export const pointTransactions = pgTable("point_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: pointTransactionTypeEnum("type").notNull(),
+  amount: integer("amount").notNull(), // 正:獲得, 負:消費
+  balanceAfter: integer("balance_after").notNull(),
+  referenceId: integer("reference_id"), // 関連するtip/purchase/subscription ID
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type PointTransaction = typeof pointTransactions.$inferSelect;
+export type InsertPointTransaction = typeof pointTransactions.$inferInsert;
+
+/**
+ * Point Packages table - ポイント購入パッケージ
+ */
+export const pointPackages = pgTable("point_packages", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 64 }).notNull(),
+  points: integer("points").notNull(),
+  priceJpy: integer("price_jpy").notNull(), // 1pt = 1円
+  stripePriceId: varchar("stripe_price_id", { length: 128 }),
+  isActive: integer("is_active").default(1).notNull(),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type PointPackage = typeof pointPackages.$inferSelect;
+export type InsertPointPackage = typeof pointPackages.$inferInsert;

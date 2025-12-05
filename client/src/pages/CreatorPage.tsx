@@ -1,14 +1,15 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { SignInButton } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe, MoreHorizontal, Flag, Ban, Copy, Check, Link as LinkIcon, Users, Sparkles, Crown } from "lucide-react";
 import { useParams, Link } from "wouter";
-import { getLoginUrl } from "@/const";
 import { TipDialog } from "@/components/TipDialog";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { PostCard } from "@/components/PostCard";
 import { ReportDialog } from "@/components/ReportDialog";
+import { Header } from "@/components/Header";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,7 @@ import { useState } from "react";
 export default function CreatorPage() {
   const { username } = useParams<{ username: string }>();
   const { isAuthenticated } = useAuth();
+  const utils = trpc.useUtils();
   const [tipDialogOpen, setTipDialogOpen] = useState(false);
   const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
@@ -63,7 +65,7 @@ export default function CreatorPage() {
 
   const blockMutation = trpc.block.toggle.useMutation({
     onSuccess: (result) => {
-      trpc.useUtils().block.check.invalidate({ userId: creator?.userId || 0 });
+      utils.block.check.invalidate({ userId: creator?.userId || 0 });
       if (result.blocked) {
         toast.success("ブロックしました");
       } else {
@@ -88,9 +90,47 @@ export default function CreatorPage() {
   );
 
   const followMutation = trpc.follow.toggle.useMutation({
-    onSuccess: () => {
-      trpc.useUtils().follow.check.invalidate({ creatorId: creator?.id || 0 });
-      trpc.useUtils().creator.getByUsername.invalidate({ username: username || "" });
+    onMutate: async () => {
+      if (!creator) return;
+      // Cancel any outgoing refetches
+      await utils.follow.check.cancel({ creatorId: creator.id });
+      await utils.creator.getByUsername.cancel({ username: username || "" });
+
+      // Snapshot the previous values
+      const previousFollowData = utils.follow.check.getData({ creatorId: creator.id });
+      const previousCreatorData = utils.creator.getByUsername.getData({ username: username || "" });
+
+      // Optimistically update
+      if (previousFollowData) {
+        utils.follow.check.setData({ creatorId: creator.id }, { following: !previousFollowData.following });
+      }
+      if (previousCreatorData) {
+        utils.creator.getByUsername.setData({ username: username || "" }, {
+          ...previousCreatorData,
+          followerCount: previousCreatorData.followerCount + (previousFollowData?.following ? -1 : 1),
+        });
+      }
+
+      return { previousFollowData, previousCreatorData };
+    },
+    onError: (_err, _variables, context) => {
+      if (!creator) return;
+      // Rollback on error
+      if (context?.previousFollowData) {
+        utils.follow.check.setData({ creatorId: creator.id }, context.previousFollowData);
+      }
+      if (context?.previousCreatorData) {
+        utils.creator.getByUsername.setData({ username: username || "" }, context.previousCreatorData);
+      }
+      toast.error("エラーが発生しました");
+    },
+    onSuccess: (data) => {
+      toast.success(data.following ? "フォローしました" : "フォローを解除しました");
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      utils.follow.check.invalidate({ creatorId: creator?.id || 0 });
+      utils.creator.getByUsername.invalidate({ username: username || "" });
     },
   });
 
@@ -131,33 +171,7 @@ export default function CreatorPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 bg-card/30 backdrop-blur-xl sticky top-0 z-50">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="relative">
-              <Heart className="h-7 w-7 text-primary fill-primary transition-transform group-hover:scale-110" />
-            </div>
-            <span className="text-xl font-bold tracking-tight">Fandry</span>
-          </Link>
-          <nav className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <>
-                <Link href="/feed">
-                  <Button variant="ghost" className="font-medium">フィード</Button>
-                </Link>
-                <Link href="/my">
-                  <Button variant="ghost" className="font-medium">マイページ</Button>
-                </Link>
-              </>
-            ) : (
-              <a href={getLoginUrl()}>
-                <Button className="shine-effect font-medium">ログイン</Button>
-              </a>
-            )}
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* Cover Image / Gradient */}
       <div className="relative w-full h-56 md:h-72 overflow-hidden">
@@ -273,12 +287,12 @@ export default function CreatorPage() {
                     </DropdownMenu>
                   </>
                 ) : (
-                  <a href={getLoginUrl()}>
+                  <SignInButton mode="modal">
                     <Button className="shine-effect gap-2 font-semibold">
                       <Heart className="h-4 w-4" />
                       応援する
                     </Button>
-                  </a>
+                  </SignInButton>
                 )}
               </div>
             </div>

@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { CreatorCard } from "@/components/CreatorCard";
-import { Button } from "@/components/ui/button";
+import { Header } from "@/components/Header";
 import { Input } from "@/components/ui/input";
 import { Loader2, Heart, Search } from "lucide-react";
-import { Link } from "wouter";
 
 export default function Discover() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,28 +17,7 @@ export default function Discover() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer">
-              <Heart className="h-6 w-6 text-primary fill-primary" />
-              <span className="font-bold text-xl">Fandry</span>
-            </div>
-          </Link>
-          <nav className="flex items-center gap-6">
-            <Link href="/feed">
-              <span className="text-sm font-medium hover:text-primary transition-colors cursor-pointer">フィード</span>
-            </Link>
-            <Link href="/discover">
-              <span className="text-sm font-medium text-primary cursor-pointer">発見</span>
-            </Link>
-            <Link href="/my">
-              <Button variant="default" size="sm">マイページ</Button>
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">

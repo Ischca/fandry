@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { createRoot } from "react-dom/client";
+import { useRef, useState } from "react";
 import superjson from "superjson";
 import App from "./App";
 import "./index.css";
@@ -17,19 +18,25 @@ const queryClient = new QueryClient();
 
 function TrpcProvider({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
+  // Keep a ref to always get the latest getToken
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
-  const trpcClient = trpc.createClient({
-    links: [
-      httpBatchLink({
-        url: "/api/trpc",
-        transformer: superjson,
-        async headers() {
-          const token = await getToken();
-          return token ? { Authorization: `Bearer ${token}` } : {};
-        },
-      }),
-    ],
-  });
+  // Create trpcClient only once using useState initializer
+  const [trpcClient] = useState(() =>
+    trpc.createClient({
+      links: [
+        httpBatchLink({
+          url: "/api/trpc",
+          transformer: superjson,
+          async headers() {
+            const token = await getTokenRef.current();
+            return token ? { Authorization: `Bearer ${token}` } : {};
+          },
+        }),
+      ],
+    })
+  );
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>

@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <!-- Warm Cream Background -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFBF5"/>
+      <stop offset="50%" stop-color="#FFF8F0"/>
+      <stop offset="100%" stop-color="#FFF5EB"/>
+    </linearGradient>
+
+    <!-- Warm Coral Gradient -->
+    <linearGradient id="coralGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F07052"/>
+      <stop offset="50%" stop-color="#E05A3A"/>
+      <stop offset="100%" stop-color="#C94A2D"/>
+    </linearGradient>
+
+    <!-- Golden Accent -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8C06A"/>
+      <stop offset="100%" stop-color="#D4A84B"/>
+    </linearGradient>
+
+    <!-- Deep Navy for text -->
+    <linearGradient id="navyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2A3A52"/>
+      <stop offset="100%" stop-color="#1E2A3E"/>
+    </linearGradient>
+
+    <!-- Soft glow effect -->
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Drop shadow for heart -->
+    <filter id="heartShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="25" flood-color="#E05A3A" flood-opacity="0.25"/>
+    </filter>
+
+    <!-- Text shadow -->
+    <filter id="textGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#E05A3A" flood-opacity="0.15"/>
+    </filter>
+
+    <!-- Subtle dot pattern -->
+    <pattern id="dots" x="0" y="0" width="50" height="50" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#E05A3A" opacity="0.05"/>
+    </pattern>
+
+    <!-- Inner highlight -->
+    <linearGradient id="shine" x1="0%" y1="0%" x2="50%" y2="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Warm cream background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+
+  <!-- Subtle dot pattern -->
+  <rect width="1200" height="630" fill="url(#dots)"/>
+
+  <!-- Decorative circles (top left) -->
+  <circle cx="-50" cy="-50" r="350" fill="none" stroke="url(#coralGrad)" stroke-width="1" opacity="0.08"/>
+  <circle cx="-50" cy="-50" r="280" fill="none" stroke="url(#coralGrad)" stroke-width="1" opacity="0.1"/>
+
+  <!-- Decorative circles (bottom right) -->
+  <circle cx="1250" cy="680" r="300" fill="none" stroke="url(#coralGrad)" stroke-width="1" opacity="0.08"/>
+  <circle cx="1250" cy="680" r="220" fill="none" stroke="url(#coralGrad)" stroke-width="1" opacity="0.1"/>
+
+  <!-- Large background heart (decorative) -->
+  <g opacity="0.06" filter="url(#softGlow)">
+    <path
+      d="M600 480C600 480 380 370 380 260C380 185 445 130 520 130C560 130 595 148 618 175C628 187 638 187 648 175C671 148 706 130 746 130C821 130 886 185 886 260C886 370 666 480 666 480C630 510 636 510 600 480Z"
+      fill="url(#coralGrad)"
+      transform="translate(0, -20)"
+    />
+  </g>
+
+  <!-- Golden sparkle accents -->
+  <circle cx="1050" cy="80" r="10" fill="url(#goldGrad)" opacity="0.7"/>
+  <circle cx="1100" cy="130" r="6" fill="url(#goldGrad)" opacity="0.5"/>
+  <circle cx="100" cy="550" r="8" fill="url(#goldGrad)" opacity="0.6"/>
+  <circle cx="150" cy="500" r="5" fill="url(#goldGrad)" opacity="0.4"/>
+
+  <!-- Main heart icon -->
+  <g filter="url(#heartShadow)" transform="translate(120, 195)">
+    <path
+      d="M100 180C100 180 20 120 20 60C20 27 47 0 80 0C100 0 118 12 130 30C135 38 145 38 150 30C162 12 180 0 200 0C233 0 260 27 260 60C260 120 180 180 180 180C150 200 130 200 100 180Z"
+      fill="url(#coralGrad)"
+    />
+    <!-- Heart highlight -->
+    <path
+      d="M55 45C55 45 35 55 35 75C35 82 38 88 42 92"
+      fill="none"
+      stroke="url(#shine)"
+      stroke-width="10"
+      stroke-linecap="round"
+    />
+  </g>
+
+  <!-- Brand name "Fandry" -->
+  <text
+    x="420"
+    y="320"
+    font-family="'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif"
+    font-size="120"
+    font-weight="800"
+    fill="#2A3A52"
+    filter="url(#textGlow)"
+    letter-spacing="-2"
+  >Fandry</text>
+
+  <!-- Tagline -->
+  <text
+    x="420"
+    y="390"
+    font-family="'Plus Jakarta Sans', 'Outfit', system-ui, sans-serif"
+    font-size="32"
+    font-weight="500"
+    fill="#5A6A7A"
+  >クリエイター支援プラットフォーム</text>
+
+  <!-- Feature badges -->
+  <g transform="translate(420, 430)">
+    <!-- Badge 1: 投げ銭 -->
+    <g>
+      <rect x="0" y="0" width="120" height="42" rx="21" fill="#E05A3A" fill-opacity="0.1" stroke="#E05A3A" stroke-opacity="0.25"/>
+      <text x="60" y="27" font-family="'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="600" fill="#C94A2D" text-anchor="middle">投げ銭</text>
+    </g>
+    <!-- Badge 2: 月額支援 -->
+    <g transform="translate(140, 0)">
+      <rect x="0" y="0" width="120" height="42" rx="21" fill="#E05A3A" fill-opacity="0.1" stroke="#E05A3A" stroke-opacity="0.25"/>
+      <text x="60" y="27" font-family="'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="600" fill="#C94A2D" text-anchor="middle">月額支援</text>
+    </g>
+    <!-- Badge 3: 有料コンテンツ -->
+    <g transform="translate(280, 0)">
+      <rect x="0" y="0" width="160" height="42" rx="21" fill="#E05A3A" fill-opacity="0.1" stroke="#E05A3A" stroke-opacity="0.25"/>
+      <text x="80" y="27" font-family="'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="600" fill="#C94A2D" text-anchor="middle">有料コンテンツ</text>
+    </g>
+  </g>
+
+  <!-- Decorative small hearts -->
+  <g fill="url(#coralGrad)">
+    <path d="M0 10C0 10 -12 5 -12 0C-12 -5 -7 -8 0 -4C7 -8 12 -5 12 0C12 5 0 10 0 10Z" transform="translate(1020, 150) scale(2)" opacity="0.5"/>
+    <path d="M0 10C0 10 -12 5 -12 0C-12 -5 -7 -8 0 -4C7 -8 12 -5 12 0C12 5 0 10 0 10Z" transform="translate(950, 510) scale(1.5)" opacity="0.35"/>
+    <path d="M0 10C0 10 -12 5 -12 0C-12 -5 -7 -8 0 -4C7 -8 12 -5 12 0C12 5 0 10 0 10Z" transform="translate(1080, 380) scale(1.8)" opacity="0.3"/>
+  </g>
+
+  <!-- URL display -->
+  <text
+    x="420"
+    y="550"
+    font-family="'Plus Jakarta Sans', monospace"
+    font-size="20"
+    font-weight="500"
+    fill="#8A9AAA"
+  >fndry.app</text>
+
+  <!-- Bottom accent bar with coral gradient -->
+  <rect x="0" y="618" width="1200" height="12" fill="url(#coralGrad)"/>
+</svg>

@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Heart, Lock, Crown, MessageCircle, Send, MoreHorizontal, Flag } from "lucide-react";
+import { Heart, Lock, Crown, MessageCircle, Send, MoreHorizontal, Flag, ArrowLeft, Share2, Bookmark } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { PurchaseDialog } from "@/components/PurchaseDialog";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { ReportDialog } from "@/components/ReportDialog";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +20,7 @@ export default function PostDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, isAuthenticated } = useAuth();
   const postId = parseInt(id || "0");
+  const utils = trpc.useUtils();
 
   const { data: post, isLoading } = trpc.post.getById.useQuery(
     { id: postId },
@@ -59,16 +60,48 @@ export default function PostDetail() {
   };
 
   const likeMutation = trpc.like.toggle.useMutation({
-    onSuccess: () => {
-      // Refetch like status and post data (to update like count)
-      trpc.useUtils().like.check.invalidate({ postId });
-      trpc.useUtils().post.getById.invalidate({ id: postId });
+    onMutate: async () => {
+      // Cancel any outgoing refetches
+      await utils.like.check.cancel({ postId });
+      await utils.post.getById.cancel({ id: postId });
+
+      // Snapshot the previous value
+      const previousLikeData = utils.like.check.getData({ postId });
+      const previousPostData = utils.post.getById.getData({ id: postId });
+
+      // Optimistically update
+      if (previousLikeData) {
+        utils.like.check.setData({ postId }, { liked: !previousLikeData.liked });
+      }
+      if (previousPostData) {
+        utils.post.getById.setData({ id: postId }, {
+          ...previousPostData,
+          likeCount: previousPostData.likeCount + (previousLikeData?.liked ? -1 : 1),
+        });
+      }
+
+      return { previousLikeData, previousPostData };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousLikeData) {
+        utils.like.check.setData({ postId }, context.previousLikeData);
+      }
+      if (context?.previousPostData) {
+        utils.post.getById.setData({ id: postId }, context.previousPostData);
+      }
+      toast.error("エラーが発生しました");
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      utils.like.check.invalidate({ postId });
+      utils.post.getById.invalidate({ id: postId });
     },
   });
 
   const handleLike = () => {
     if (!isAuthenticated) {
-      alert("いいねするにはログインが必要です。");
+      toast.error("いいねするにはログインが必要です");
       return;
     }
     likeMutation.mutate({ postId });
@@ -88,31 +121,60 @@ export default function PostDetail() {
 
   const handlePurchaseSuccess = () => {
     // Refresh post data to update access
-    trpc.useUtils().post.getById.invalidate({ id: postId });
+    utils.post.getById.invalidate({ id: postId });
   };
 
   const handleSubscribeSuccess = () => {
     // Refresh post data to update access
-    trpc.useUtils().post.getById.invalidate({ id: postId });
+    utils.post.getById.invalidate({ id: postId });
   };
 
   const isLiked = likeData?.liked || false;
 
+  // Relative time formatting
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "たった今";
+    if (diffMins < 60) return `${diffMins}分前`;
+    if (diffHours < 24) return `${diffHours}時間前`;
+    if (diffDays < 7) return `${diffDays}日前`;
+    return date.toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
+  };
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">読み込み中...</div>
+      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+          </div>
+          <p className="text-sm text-muted-foreground animate-pulse">読み込み中...</p>
+        </div>
       </div>
     );
   }
 
   if (!post) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">投稿が見つかりません</h2>
+      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 flex items-center justify-center">
+        <div className="text-center space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="w-20 h-20 mx-auto rounded-full bg-muted/50 flex items-center justify-center">
+            <Heart className="h-8 w-8 text-muted-foreground/50" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold tracking-tight">投稿が見つかりません</h2>
+            <p className="text-muted-foreground">削除されたか、URLが間違っている可能性があります</p>
+          </div>
           <Link href="/feed">
-            <Button>フィードに戻る</Button>
+            <Button variant="outline" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              フィードに戻る
+            </Button>
           </Link>
         </div>
       </div>
@@ -120,83 +182,147 @@ export default function PostDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* ヘッダー */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="h-6 w-6 text-primary fill-primary" />
-            <span className="text-xl font-bold">Fandry</span>
-          </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/feed">
-              <Button variant="ghost">フィード</Button>
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/10">
+      {/* Minimal Header */}
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/50">
+        <div className="container max-w-4xl flex h-14 items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href={`/creator/${post.creatorUsername}`}>
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-muted/80">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
             </Link>
-            <Link href="/discover">
-              <Button variant="ghost">発見</Button>
+            <Link href={`/creator/${post.creatorUsername}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <img
+                src={post.creatorAvatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.creatorUsername}`}
+                alt=""
+                className="w-8 h-8 rounded-full ring-2 ring-background shadow-sm"
+              />
+              <span className="font-medium text-sm hidden sm:inline">{post.creatorDisplayName}</span>
             </Link>
-            {isAuthenticated && (
-              <Link href="/my">
-                <Button variant="default">マイページ</Button>
-              </Link>
-            )}
-          </nav>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+              <Bookmark className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[160px]">
+                <DropdownMenuItem
+                  onClick={() => setReportDialogOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Flag className="h-4 w-4 mr-2" />
+                  通報する
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
-      {/* メインコンテンツ */}
-      <main className="container max-w-3xl py-8">
-        <Card className="p-6 space-y-6">
-          {/* クリエイター情報 */}
-          <Link href={`/creator/${post.creatorUsername}`}>
-            <div className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-              <img
-                src={post.creatorAvatarUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=default"}
-                alt={post.creatorDisplayName || ""}
-                className="w-12 h-12 rounded-full"
-              />
-              <div>
-                <div className="font-semibold">{post.creatorDisplayName}</div>
-                <div className="text-sm text-muted-foreground">@{post.creatorUsername}</div>
+      {/* Main Content */}
+      <main className="container max-w-4xl py-6 sm:py-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <article className="space-y-8">
+          {/* Post Header */}
+          <header className="space-y-4">
+            {/* Creator Info - Mobile */}
+            <Link href={`/creator/${post.creatorUsername}`} className="sm:hidden">
+              <div className="flex items-center gap-3 group">
+                <div className="relative">
+                  <img
+                    src={post.creatorAvatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.creatorUsername}`}
+                    alt=""
+                    className="w-11 h-11 rounded-full ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{post.creatorDisplayName}</p>
+                  <p className="text-xs text-muted-foreground">@{post.creatorUsername}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">{formatRelativeTime(new Date(post.createdAt))}</span>
               </div>
+            </Link>
+
+            {/* Title */}
+            {post.title && (
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight leading-tight">
+                {post.title}
+              </h1>
+            )}
+
+            {/* Meta - Desktop */}
+            <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
+              <Link href={`/creator/${post.creatorUsername}`} className="hover:text-foreground transition-colors">
+                {post.creatorDisplayName}
+              </Link>
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+              <time>{formatRelativeTime(new Date(post.createdAt))}</time>
+              {post.type !== "free" && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                  {post.type === "paid" ? (
+                    <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-500 font-medium">
+                      <Lock className="h-3.5 w-3.5" />
+                      ¥{post.price?.toLocaleString()}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-violet-600 dark:text-violet-400 font-medium">
+                      <Crown className="h-3.5 w-3.5" />
+                      会員限定
+                    </span>
+                  )}
+                </>
+              )}
             </div>
-          </Link>
+          </header>
 
-          {/* 投稿タイトル */}
-          {post.title && (
-            <h1 className="text-2xl font-bold">{post.title}</h1>
-          )}
-
-          {/* メディア表示 */}
+          {/* Media Section */}
           {post.hasAccess && post.mediaUrls && (() => {
             const mediaUrls = JSON.parse(post.mediaUrls);
             if (mediaUrls.length === 0) return null;
-            
+
             return (
-              <div className="space-y-4">
+              <div className="space-y-3 -mx-4 sm:mx-0">
                 {mediaUrls.map((url: string, index: number) => {
-                  // 画像か動画かを判定（簡易的な判定）
                   const isVideo = url.match(/\.(mp4|webm|ogg|mov)$/i);
-                  
+
                   if (isVideo) {
                     return (
-                      <video
-                        key={index}
-                        controls
-                        className="w-full rounded-lg"
-                        src={url}
-                      >
-                        お使いのブラウザは動画再生に対応していません。
-                      </video>
+                      <div key={index} className="relative bg-black sm:rounded-2xl overflow-hidden shadow-2xl shadow-black/10">
+                        <video
+                          controls
+                          className="w-full"
+                          src={url}
+                        >
+                          お使いのブラウザは動画再生に対応していません。
+                        </video>
+                      </div>
                     );
                   } else {
                     return (
-                      <img
-                        key={index}
-                        src={url}
-                        alt={`${post.title || "投稿"} - 画像 ${index + 1}`}
-                        className="w-full rounded-lg"
-                      />
+                      <figure key={index} className="relative group">
+                        <div className="overflow-hidden sm:rounded-2xl bg-muted/30 shadow-xl shadow-black/5">
+                          <img
+                            src={url}
+                            alt={`${post.title || "投稿"} - 画像 ${index + 1}`}
+                            className="w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                            style={{ maxHeight: "80vh" }}
+                          />
+                        </div>
+                        {mediaUrls.length > 1 && (
+                          <figcaption className="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-black/60 text-white text-xs font-medium backdrop-blur-sm">
+                            {index + 1} / {mediaUrls.length}
+                          </figcaption>
+                        )}
+                      </figure>
                     );
                   }
                 })}
@@ -204,207 +330,219 @@ export default function PostDetail() {
             );
           })()}
 
-          {/* 投稿タイプバッジ */}
-          {post.type === "paid" && (
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 text-sm font-medium">
-              <Lock className="h-4 w-4" />
-              <span>有料 ¥{post.price?.toLocaleString()}</span>
-            </div>
-          )}
-          {post.type === "membership" && (
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 text-sm font-medium">
-              <Crown className="h-4 w-4" />
-              <span>会員限定</span>
-            </div>
-          )}
-
-          {/* 投稿本文 */}
-          {post.hasAccess ? (
-            <div className="prose prose-neutral dark:prose-invert max-w-none">
-              <p className="whitespace-pre-wrap">{post.content}</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* プレビュー（最初の100文字） */}
-              <div className="prose prose-neutral dark:prose-invert max-w-none">
-                <p className="whitespace-pre-wrap text-muted-foreground">
-                  {post.content.substring(0, 100)}...
-                </p>
+          {/* Locked Content Preview */}
+          {!post.hasAccess && post.type !== "free" && (
+            <div className="relative -mx-4 sm:mx-0">
+              {/* Blurred preview background */}
+              <div className="absolute inset-0 sm:rounded-2xl overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/95 to-background/80 z-10" />
+                <div className="w-full h-full bg-gradient-to-br from-muted via-muted/50 to-muted/30 blur-sm" />
               </div>
 
-              {/* アクセス制限メッセージ */}
-              <Card className="p-8 text-center space-y-4 bg-muted/50">
-                {post.type === "paid" ? (
-                  <>
-                    <Lock className="h-12 w-12 mx-auto text-muted-foreground" />
-                    <h3 className="text-xl font-semibold">この投稿は有料コンテンツです</h3>
-                    <p className="text-muted-foreground">
-                      ¥{post.price?.toLocaleString()}で購入すると、全文を閲覧できます。
-                    </p>
-                    {isAuthenticated ? (
-                      <Button size="lg" onClick={handlePurchase}>
-                        ¥{post.price?.toLocaleString()}で購入する
-                      </Button>
+              {/* Lock card */}
+              <div className="relative z-20 py-16 sm:py-24 px-6">
+                <div className="max-w-md mx-auto text-center space-y-6">
+                  <div className={`inline-flex p-4 rounded-2xl ${post.type === "paid" ? "bg-amber-500/10" : "bg-violet-500/10"}`}>
+                    {post.type === "paid" ? (
+                      <Lock className="h-8 w-8 text-amber-600 dark:text-amber-500" />
                     ) : (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          購入するにはログインが必要です
-                        </p>
-                        <Button size="lg" asChild>
-                          <a href={`/api/oauth/login?redirect=${encodeURIComponent(window.location.pathname)}`}>
-                            ログインして購入
-                          </a>
-                        </Button>
-                      </div>
+                      <Crown className="h-8 w-8 text-violet-600 dark:text-violet-400" />
                     )}
-                  </>
-                ) : (
-                  <>
-                    <Crown className="h-12 w-12 mx-auto text-muted-foreground" />
-                    <h3 className="text-xl font-semibold">この投稿は会員限定です</h3>
-                    <p className="text-muted-foreground">
-                      {post.creatorDisplayName}の月額支援プランに加入すると閲覧できます。
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">
+                      {post.type === "paid" ? "有料コンテンツ" : "会員限定コンテンツ"}
+                    </h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      {post.type === "paid"
+                        ? `このコンテンツを閲覧するには ¥${post.price?.toLocaleString()} でご購入ください`
+                        : `${post.creatorDisplayName}のメンバーシップに加入すると閲覧できます`}
                     </p>
-                    {plans && plans.length > 0 && (() => {
-                      const requiredPlans = plans.filter(p => p.tier >= (post.membershipTier || 1));
-                      if (requiredPlans.length > 0) {
-                        return (
-                          <div className="w-full space-y-2">
-                            <p className="text-sm font-medium">閲覧に必要なプラン:</p>
-                            <div className="grid gap-2">
-                              {requiredPlans.map(plan => (
-                                <div key={plan.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                                  <div>
-                                    <p className="font-medium">{plan.name}</p>
-                                    <p className="text-xs text-muted-foreground">{plan.subscriberCount}人が加入中</p>
-                                  </div>
-                                  <p className="text-lg font-bold">￥{plan.price.toLocaleString()}<span className="text-xs font-normal text-muted-foreground">/月</span></p>
-                                </div>
-                              ))}
+                  </div>
+
+                  {/* Plans for membership */}
+                  {post.type === "membership" && plans && plans.length > 0 && (() => {
+                    const requiredPlans = plans.filter(p => p.tier >= (post.membershipTier || 1));
+                    if (requiredPlans.length > 0) {
+                      return (
+                        <div className="space-y-2 text-left">
+                          {requiredPlans.slice(0, 2).map(plan => (
+                            <div key={plan.id} className="flex items-center justify-between p-3 rounded-xl border bg-card/50 backdrop-blur-sm">
+                              <div className="space-y-0.5">
+                                <p className="font-medium text-sm">{plan.name}</p>
+                                <p className="text-xs text-muted-foreground">{plan.subscriberCount}人が加入中</p>
+                              </div>
+                              <p className="font-bold">
+                                ¥{plan.price.toLocaleString()}
+                                <span className="text-xs font-normal text-muted-foreground">/月</span>
+                              </p>
                             </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                    {isAuthenticated ? (
-                      <Button size="lg" onClick={handleSubscribe}>
-                        プランを見る
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {isAuthenticated ? (
+                    <Button
+                      size="lg"
+                      onClick={post.type === "paid" ? handlePurchase : handleSubscribe}
+                      className={`w-full sm:w-auto gap-2 ${
+                        post.type === "paid"
+                          ? "bg-amber-600 hover:bg-amber-700 text-white"
+                          : "bg-violet-600 hover:bg-violet-700 text-white"
+                      }`}
+                    >
+                      {post.type === "paid" ? (
+                        <>¥{post.price?.toLocaleString()}で購入</>
+                      ) : (
+                        <>プランを見る</>
+                      )}
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        {post.type === "paid" ? "購入" : "加入"}するにはログインが必要です
+                      </p>
+                      <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                        ログイン
                       </Button>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          プランに加入するにはログインが必要です
-                        </p>
-                        <Button size="lg" asChild>
-                          <a href={`/api/oauth/login?redirect=${encodeURIComponent(window.location.pathname)}`}>
-                            ログインして加入
-                          </a>
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </Card>
-            </div>
-          )}
-
-          {/* アクションボタン */}
-          <div className="flex items-center gap-4 pt-4 border-t">
-            <Button
-              variant={isLiked ? "default" : "outline"}
-              size="sm"
-              onClick={handleLike}
-              disabled={likeMutation.isPending}
-              className="gap-2"
-            >
-              <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
-              <span>{post.likeCount}</span>
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2">
-              <MessageCircle className="h-4 w-4" />
-              <span>{post.commentCount}</span>
-            </Button>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {new Date(post.createdAt).toLocaleDateString("ja-JP")}
-              </span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => setReportDialogOpen(true)}
-                    className="text-destructive"
-                  >
-                    <Flag className="h-4 w-4 mr-2" />
-                    通報する
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </Card>
-
-        {/* コメントセクション */}
-        <Card className="p-6 space-y-6">
-          <h2 className="text-xl font-bold">コメント ({post.commentCount})</h2>
-
-          {/* コメント投稿フォーム */}
-          {isAuthenticated ? (
-            <form onSubmit={handleCommentSubmit} className="flex gap-2">
-              <input
-                type="text"
-                value={commentContent}
-                onChange={(e) => setCommentContent(e.target.value)}
-                placeholder="コメントを入力..."
-                className="flex-1 px-4 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                maxLength={500}
-              />
-              <Button type="submit" disabled={!commentContent.trim() || commentMutation.isPending} size="icon">
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-          ) : (
-            <div className="text-center py-4 text-muted-foreground">
-              <p>コメントするにはログインが必要です</p>
-              <Button className="mt-2" asChild>
-                <a href={`/api/oauth/login?redirect=${encodeURIComponent(window.location.pathname)}`}>
-                  ログイン
-                </a>
-              </Button>
-            </div>
-          )}
-
-          {/* コメント一覧 */}
-          <div className="space-y-4">
-            {comments && comments.length > 0 ? (
-              comments.map((comment) => (
-                <div key={comment.id} className="flex gap-3 p-4 rounded-lg bg-muted/30">
-                  <div className="flex-shrink-0">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-medium">{comment.userDisplayName?.charAt(0) || "?"}</span>
                     </div>
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{comment.userDisplayName}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(comment.createdAt).toLocaleDateString("ja-JP")}
-                      </span>
-                    </div>
-                    <p className="text-sm">{comment.content}</p>
-                  </div>
+                  )}
                 </div>
-              ))
-            ) : (
-              <p className="text-center text-muted-foreground py-8">まだコメントがありません</p>
-            )}
+              </div>
+            </div>
+          )}
+
+          {/* Post Content */}
+          {post.hasAccess && (
+            <div className="prose prose-neutral dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:text-[15px] sm:prose-p:text-base">
+              <p className="whitespace-pre-wrap">{post.content}</p>
+            </div>
+          )}
+
+          {/* Floating Action Bar */}
+          <div className="sticky bottom-4 z-40 flex justify-center">
+            <div className="inline-flex items-center gap-1 p-1.5 rounded-full bg-card/95 backdrop-blur-xl border shadow-lg shadow-black/5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLike}
+                disabled={likeMutation.isPending}
+                className={`rounded-full gap-2 px-4 transition-all ${
+                  isLiked
+                    ? "text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Heart className={`h-4 w-4 transition-transform ${isLiked ? "fill-current scale-110" : ""}`} />
+                <span className="font-medium">{post.likeCount}</span>
+              </Button>
+
+              <div className="w-px h-5 bg-border" />
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full gap-2 px-4 text-muted-foreground hover:text-foreground"
+                onClick={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth" })}
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span className="font-medium">{post.commentCount}</span>
+              </Button>
+
+              <div className="w-px h-5 bg-border" />
+
+              <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+                <Share2 className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </Card>
+
+          {/* Divider */}
+          <div className="relative py-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border/50" />
+            </div>
+          </div>
+
+          {/* Comments Section */}
+          <section id="comments" className="space-y-6 scroll-mt-20">
+            <header className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold tracking-tight">
+                コメント
+                {post.commentCount > 0 && (
+                  <span className="ml-2 text-muted-foreground font-normal">({post.commentCount})</span>
+                )}
+              </h2>
+            </header>
+
+            {/* Comment Form */}
+            {isAuthenticated ? (
+              <form onSubmit={handleCommentSubmit} className="relative">
+                <input
+                  type="text"
+                  value={commentContent}
+                  onChange={(e) => setCommentContent(e.target.value)}
+                  placeholder="コメントを追加..."
+                  className="w-full pl-4 pr-12 py-3 rounded-xl border border-border/50 bg-muted/30 focus:bg-background focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
+                  maxLength={500}
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!commentContent.trim() || commentMutation.isPending}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg h-8 w-8"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            ) : (
+              <div className="text-center py-8 rounded-xl border border-dashed border-border/50 bg-muted/20">
+                <p className="text-sm text-muted-foreground mb-3">コメントするにはログインが必要です</p>
+                <Button variant="outline" size="sm">ログイン</Button>
+              </div>
+            )}
+
+            {/* Comments List */}
+            <div className="space-y-1">
+              {comments && comments.length > 0 ? (
+                comments.map((comment, index) => (
+                  <div
+                    key={comment.id}
+                    className="group flex gap-3 p-4 -mx-4 sm:mx-0 sm:rounded-xl hover:bg-muted/30 transition-colors"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className="flex-shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center ring-1 ring-border/50">
+                        <span className="text-sm font-semibold text-primary/80">
+                          {comment.userDisplayName?.charAt(0).toUpperCase() || "?"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{comment.userDisplayName}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatRelativeTime(new Date(comment.createdAt))}
+                        </span>
+                      </div>
+                      <p className="text-sm leading-relaxed text-foreground/90">{comment.content}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-12">
+                  <MessageCircle className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">まだコメントがありません</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">最初のコメントを投稿しましょう</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </article>
       </main>
 
       {/* Purchase Dialog */}

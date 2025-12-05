@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Heart, Trophy, Users, Sparkles, User, TrendingUp } from "lucide-react";
+import { Header } from "@/components/Header";
+import { Trophy, Users, Sparkles, User, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 
 type RankingType = "support" | "followers" | "newest";
@@ -15,7 +15,6 @@ const RANKING_TABS: { type: RankingType; label: string; icon: React.ReactNode }[
 ];
 
 export default function Ranking() {
-  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<RankingType>("support");
 
   const { data: supportRanking, isLoading: loadingSupport } = trpc.ranking.bySupport.useQuery(
@@ -100,29 +99,7 @@ export default function Ranking() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ヘッダー */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="h-6 w-6 text-primary fill-primary" />
-            <span className="text-xl font-bold">Fandry</span>
-          </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/discover">
-              <Button variant="ghost">発見</Button>
-            </Link>
-            {isAuthenticated ? (
-              <Link href="/my">
-                <Button variant="ghost">マイページ</Button>
-              </Link>
-            ) : (
-              <Link href="/">
-                <Button>ログイン</Button>
-              </Link>
-            )}
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* メインコンテンツ */}
       <main className="container max-w-3xl py-8">

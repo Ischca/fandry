@@ -1,11 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { SignInButton } from "@clerk/clerk-react";
 import { trpc } from "@/lib/trpc";
 import { PostCard } from "@/components/PostCard";
-import { PointBalance } from "@/components/PointBalance";
+import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
-import { Loader2, Heart, PenSquare } from "lucide-react";
+import { Loader2, Heart } from "lucide-react";
 import { Link } from "wouter";
-import { getLoginUrl } from "@/const";
 
 export default function Feed() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -31,9 +31,9 @@ export default function Feed() {
           <p className="text-muted-foreground">
             フォロー中のクリエイターの最新投稿をチェックしましょう
           </p>
-          <Button asChild size="lg">
-            <a href={getLoginUrl()}>ログイン</a>
-          </Button>
+          <SignInButton mode="modal">
+            <Button size="lg">ログイン</Button>
+          </SignInButton>
         </div>
       </div>
     );
@@ -58,35 +58,7 @@ export default function Feed() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer">
-              <Heart className="h-6 w-6 text-primary fill-primary" />
-              <span className="font-bold text-xl">Fandry</span>
-            </div>
-          </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/feed">
-              <span className="text-sm font-medium text-primary cursor-pointer">フィード</span>
-            </Link>
-            <Link href="/discover">
-              <span className="text-sm font-medium hover:text-primary transition-colors cursor-pointer">発見</span>
-            </Link>
-            <Link href="/create-post">
-              <Button variant="outline" size="sm" className="gap-2">
-                <PenSquare className="h-4 w-4" />
-                投稿
-              </Button>
-            </Link>
-            <PointBalance />
-            <Link href="/my">
-              <Button variant="default" size="sm">マイページ</Button>
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* Feed Content */}
       <main className="container mx-auto px-4 py-8">

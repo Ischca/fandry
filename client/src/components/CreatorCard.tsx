@@ -1,12 +1,12 @@
 import { Heart, Users, UserPlus, UserMinus } from "lucide-react";
 import { Link } from "wouter";
+import { useClerk } from "@clerk/clerk-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
-import { getLoginUrl } from "@/const";
 
 interface CreatorCardProps {
   creator: {
@@ -23,12 +23,13 @@ interface CreatorCardProps {
 
 export function CreatorCard({ creator }: CreatorCardProps) {
   const { isAuthenticated } = useAuth();
+  const { openSignIn } = useClerk();
   const utils = trpc.useUtils();
   const { data: followStatus } = trpc.follow.check.useQuery(
     { creatorId: creator.id },
     { enabled: isAuthenticated }
   );
-  
+
   const followMutation = trpc.follow.toggle.useMutation({
     onSuccess: (data) => {
       utils.follow.check.invalidate({ creatorId: creator.id });
@@ -43,7 +44,7 @@ export function CreatorCard({ creator }: CreatorCardProps) {
   const handleFollow = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      window.location.href = getLoginUrl();
+      openSignIn();
       return;
     }
     followMutation.mutate({ creatorId: creator.id });

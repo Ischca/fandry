@@ -1,0 +1,26 @@
+# Fandry Robots.txt
+# https://fndry.app
+
+User-agent: *
+Allow: /
+
+# Disallow admin and private paths
+Disallow: /api/
+Disallow: /admin/
+Disallow: /manage-*
+Disallow: /edit-*
+Disallow: /create-*
+Disallow: /dashboard
+
+# Allow social sharing crawlers
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+# Sitemap location
+Sitemap: https://fndry.app/sitemap.xml

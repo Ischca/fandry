@@ -1,10 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { SignInButton } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Heart, User, Copy, Check, ExternalLink } from "lucide-react";
 import { useParams, Link } from "wouter";
-import { getLoginUrl } from "@/const";
 import { TipDialog } from "@/components/TipDialog";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -70,9 +70,9 @@ export default function TipPage() {
                 <Button variant="ghost">マイページ</Button>
               </Link>
             ) : (
-              <a href={getLoginUrl()}>
+              <SignInButton mode="modal">
                 <Button variant="default">ログイン</Button>
-              </a>
+              </SignInButton>
             )}
           </nav>
         </div>
@@ -127,12 +127,12 @@ export default function TipPage() {
               チップを送る
             </Button>
           ) : (
-            <a href={getLoginUrl()} className="block">
+            <SignInButton mode="modal">
               <Button size="lg" className="w-full gap-2 text-lg py-6">
                 <Heart className="h-5 w-5" />
                 ログインして応援する
               </Button>
-            </a>
+            </SignInButton>
           )}
 
           {/* クリエイターページへのリンク */}

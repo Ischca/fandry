@@ -25,6 +25,17 @@ export const creatorRouter = router({
       return creator;
     }),
 
+  // Get current user's creator profile
+  getMe: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    const result = await db
+      ?.select()
+      .from(creators)
+      .where(eq(creators.userId, ctx.user.id))
+      .limit(1);
+    return result?.[0] ?? null;
+  }),
+
   create: protectedProcedure
     .input(z.object({
       username: z.string().min(3).max(64),

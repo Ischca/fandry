@@ -41,12 +41,23 @@ client/               # React frontend (Vite)
 ├── src/
 │   ├── pages/        # Route components (Home, CreatorPage, Feed, etc.)
 │   ├── components/   # Shared UI (shadcn/ui based)
+│   │   ├── Header.tsx           # Shared site header (nav, search, user menu)
+│   │   ├── PostCard.tsx         # Post card with like/comment actions
 │   │   ├── PurchaseDialog.tsx   # Content purchase with payment method selection
 │   │   ├── SubscribeDialog.tsx  # Subscription with points/Stripe
 │   │   ├── TipDialog.tsx        # Tipping with hybrid payment
 │   │   ├── PointBalance.tsx     # Header point balance display
 │   │   └── ...
 │   └── lib/trpc.ts   # tRPC client setup
+├── public/           # Static assets
+│   ├── favicon.svg   # SVG favicon (warm coral theme)
+│   ├── og-image.svg  # OG image source
+│   ├── robots.txt    # Search engine directives
+│   ├── sitemap.xml   # Site map for SEO
+│   └── site.webmanifest  # PWA manifest
+
+scripts/              # Build/dev scripts
+└── generate-images.mjs  # SVG to PNG converter (uses sharp)
 
 server/               # Express + tRPC backend
 ├── routers.ts        # Main router aggregation
@@ -103,6 +114,11 @@ shared/               # Shared types and constants
 **Path Aliases**:
 - `@/*` → `./client/src/*`
 - `@shared/*` → `./shared/*`
+
+**SEO**: Comprehensive meta tags in `client/index.html`:
+- OGP, Twitter Card, JSON-LD structured data
+- Favicon/OG images use "Warm Celebration" theme (coral `#E05A3A`)
+- Run `node scripts/generate-images.mjs` to regenerate PNGs from SVGs
 
 ### Data Model
 

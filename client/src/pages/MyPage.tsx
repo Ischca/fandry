@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { SignInButton } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import { Header } from "@/components/Header";
 import {
   Heart,
   User,
@@ -21,18 +23,16 @@ import {
   BarChart3,
 } from "lucide-react";
 import { Link } from "wouter";
-import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
 
 export default function MyPage() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, loading } = useAuth();
   const [copied, setCopied] = useState(false);
 
   // Get creator profile for the current user
-  const { data: creatorProfile } = trpc.creator.getByUsername.useQuery(
-    { username: user?.name || "" },
-    { enabled: isAuthenticated && !!user?.name, retry: false }
-  );
+  const { data: creatorProfile } = trpc.creator.getMe.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
   // Get my posts count
   const { data: myPosts } = trpc.post.getMyPosts.useQuery(
@@ -58,6 +58,14 @@ export default function MyPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
@@ -66,35 +74,16 @@ export default function MyPage() {
         <p className="text-muted-foreground">
           マイページを表示するにはログインしてください
         </p>
-        <a href={getLoginUrl()}>
+        <SignInButton mode="modal">
           <Button>ログイン</Button>
-        </a>
+        </SignInButton>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ヘッダー */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="h-6 w-6 text-primary fill-primary" />
-            <span className="text-xl font-bold">Fandry</span>
-          </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/feed">
-              <Button variant="ghost">フィード</Button>
-            </Link>
-            <Link href="/discover">
-              <Button variant="ghost">発見</Button>
-            </Link>
-            <Link href="/ranking">
-              <Button variant="ghost">ランキング</Button>
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* メインコンテンツ */}
       <main className="container max-w-4xl py-8">
@@ -329,10 +318,12 @@ export default function MyPage() {
             <p className="text-muted-foreground mb-4">
               ファンからの応援を受け取って活動を広げましょう
             </p>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              クリエイター登録
-            </Button>
+            <Link href="/become-creator">
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                クリエイター登録
+              </Button>
+            </Link>
           </Card>
         )}
 

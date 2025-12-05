@@ -20,6 +20,24 @@
 - [x] ローディング状態
 - [x] テストデータ投入
 
+### フェーズ11: SEO・UI改善 (完了)
+- [x] SEO Phase 1実装
+  - [x] index.html meta tags (description, keywords, author)
+  - [x] OGP (Open Graph Protocol) 設定
+  - [x] Twitter Card設定
+  - [x] JSON-LD構造化データ
+  - [x] favicon.svg / favicon-*.png 生成
+  - [x] og-image.svg / og-image.png 生成
+  - [x] apple-touch-icon.svg / apple-touch-icon.png
+  - [x] robots.txt / sitemap.xml
+  - [x] site.webmanifest (PWA対応)
+- [x] 共通ヘッダーコンポーネント（Header.tsx）
+- [x] PostCard UI改善（ホバー効果、相対時間表示、バッジ改善）
+- [x] PostDetail UI改善
+- [x] CreatorPage UI改善
+- [x] いいね・フォローボタンのバグ修正（optimistic updates対応）
+- [x] クリエイター登録ページ（BecomeCreator.tsx）
+
 ### フェーズ10: ポイント決済システム (完了)
 - [x] ポイントテーブル設計（userPoints, pointTransactions, pointPackages）
 - [x] isAdultフラグ（creators, posts, subscriptionPlans）

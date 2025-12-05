@@ -53,24 +53,26 @@ export function AgeVerification({ children }: { children: React.ReactNode }) {
             <AlertDialogTitle className="text-2xl">
               年齢確認
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-base space-y-4">
-              <p>
-                このサイトには成人向けコンテンツが含まれています。
-              </p>
-              <p className="font-medium text-foreground">
-                あなたは18歳以上ですか？
-              </p>
-              <p className="text-xs text-muted-foreground">
-                「はい」を選択することで、
-                <Link href="/terms" className="underline hover:text-primary">
-                  利用規約
-                </Link>
-                および
-                <Link href="/privacy" className="underline hover:text-primary">
-                  プライバシーポリシー
-                </Link>
-                に同意したものとみなされます。
-              </p>
+            <AlertDialogDescription asChild>
+              <div className="text-base space-y-4 text-muted-foreground">
+                <p>
+                  このサイトには成人向けコンテンツが含まれています。
+                </p>
+                <p className="font-medium text-foreground">
+                  あなたは18歳以上ですか？
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  「はい」を選択することで、
+                  <Link href="/terms" className="underline hover:text-primary">
+                    利用規約
+                  </Link>
+                  および
+                  <Link href="/privacy" className="underline hover:text-primary">
+                    プライバシーポリシー
+                  </Link>
+                  に同意したものとみなされます。
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">

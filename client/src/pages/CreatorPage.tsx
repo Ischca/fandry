@@ -3,7 +3,7 @@ import { SignInButton } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe, MoreHorizontal, Flag, Ban, Copy, Check, Link as LinkIcon, Users, Sparkles, Crown } from "lucide-react";
+import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe, MoreHorizontal, Flag, Ban, Copy, Check, Link as LinkIcon, Users, Sparkles, Crown, Settings } from "lucide-react";
 import { useParams, Link } from "wouter";
 import { TipDialog } from "@/components/TipDialog";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
@@ -17,7 +17,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+
+// Validate URL to only allow http/https protocols
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 export default function CreatorPage() {
   const { username } = useParams<{ username: string }>();
@@ -47,6 +57,14 @@ export default function CreatorPage() {
     { username: username || "" },
     { enabled: !!username }
   );
+
+  // Get current user's creator profile to check if this is their own page
+  const { data: myCreator } = trpc.creator.getMe.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+
+  // Check if viewing own profile
+  const isOwnProfile = isAuthenticated && myCreator && creator && myCreator.id === creator.id;
 
   const { data: posts, isLoading: postsLoading } = trpc.post.getByCreatorUsername.useQuery(
     { username: username || "", limit: 20 },
@@ -245,7 +263,16 @@ export default function CreatorPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                {isAuthenticated ? (
+                {isOwnProfile ? (
+                  /* Own profile - show edit button */
+                  <Link href="/settings/profile">
+                    <Button className="gap-2 font-semibold">
+                      <Settings className="h-4 w-4" />
+                      プロフィール編集
+                    </Button>
+                  </Link>
+                ) : isAuthenticated ? (
+                  /* Other creator's profile - show follow/tip/report buttons */
                   <>
                     <Button
                       variant={isFollowing ? "secondary" : "outline"}
@@ -330,7 +357,7 @@ export default function CreatorPage() {
                 if (Object.keys(links).length === 0) return null;
                 return (
                   <div className="flex items-center gap-2">
-                    {links.twitter && (
+                    {links.twitter && isSafeUrl(links.twitter) && (
                       <a
                         href={links.twitter}
                         target="_blank"
@@ -340,7 +367,7 @@ export default function CreatorPage() {
                         <Twitter className="h-5 w-5" />
                       </a>
                     )}
-                    {links.instagram && (
+                    {links.instagram && isSafeUrl(links.instagram) && (
                       <a
                         href={links.instagram}
                         target="_blank"
@@ -350,7 +377,7 @@ export default function CreatorPage() {
                         <Instagram className="h-5 w-5" />
                       </a>
                     )}
-                    {links.youtube && (
+                    {links.youtube && isSafeUrl(links.youtube) && (
                       <a
                         href={links.youtube}
                         target="_blank"
@@ -360,7 +387,7 @@ export default function CreatorPage() {
                         <Youtube className="h-5 w-5" />
                       </a>
                     )}
-                    {links.website && (
+                    {links.website && isSafeUrl(links.website) && (
                       <a
                         href={links.website}
                         target="_blank"
@@ -484,8 +511,8 @@ export default function CreatorPage() {
         </section>
       </div>
 
-      {/* Dialogs */}
-      {isAuthenticated && (
+      {/* Dialogs - only for other creators, not own profile */}
+      {isAuthenticated && !isOwnProfile && (
         <>
           <TipDialog
             open={tipDialogOpen}

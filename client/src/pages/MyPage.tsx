@@ -112,12 +112,20 @@ export default function MyPage() {
             </div>
             <div className="flex gap-2">
               {creatorProfile && (
-                <Link href={`/creator/${creatorProfile.username}`}>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Eye className="h-4 w-4" />
-                    プロフィール表示
-                  </Button>
-                </Link>
+                <>
+                  <Link href={`/creator/${creatorProfile.username}`}>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Eye className="h-4 w-4" />
+                      表示
+                    </Button>
+                  </Link>
+                  <Link href="/settings/profile">
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Edit2 className="h-4 w-4" />
+                      編集
+                    </Button>
+                  </Link>
+                </>
               )}
               <Button
                 variant="outline"

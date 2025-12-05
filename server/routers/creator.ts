@@ -9,12 +9,45 @@ import {
   ErrorMessages,
   assertFound,
   throwConflict,
+  throwBadRequest,
 } from "./_shared";
 import {
   getCreatorByUsername,
   createCreator,
   updateCreator,
 } from "../db";
+
+// Validate URL to only allow http/https protocols
+function isValidUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// Validate and sanitize social links JSON
+function validateSocialLinks(jsonStr: string): string {
+  const parsed = JSON.parse(jsonStr);
+  const sanitized: Record<string, string> = {};
+
+  const allowedKeys = ["twitter", "instagram", "youtube", "website"];
+
+  for (const key of allowedKeys) {
+    if (parsed[key] && typeof parsed[key] === "string") {
+      const url = parsed[key].trim();
+      if (url && !isValidUrl(url)) {
+        throw new Error(`Invalid URL for ${key}: must be http or https`);
+      }
+      if (url) {
+        sanitized[key] = url;
+      }
+    }
+  }
+
+  return JSON.stringify(sanitized);
+}
 
 export const creatorRouter = router({
   getByUsername: publicProcedure
@@ -73,7 +106,18 @@ export const creatorRouter = router({
         db?.select().from(creators).where(eq(creators.userId, ctx.user.id)).limit(1)
       );
       assertFound(creator?.[0], ErrorMessages.CREATOR_NOT_FOUND);
-      await updateCreator(creator[0].id, input);
+
+      // Validate and sanitize social links if provided
+      let sanitizedInput = { ...input };
+      if (input.socialLinks) {
+        try {
+          sanitizedInput.socialLinks = validateSocialLinks(input.socialLinks);
+        } catch (error) {
+          throwBadRequest(error instanceof Error ? error.message : "Invalid social links");
+        }
+      }
+
+      await updateCreator(creator[0].id, sanitizedInput);
       return { success: true };
     }),
 });

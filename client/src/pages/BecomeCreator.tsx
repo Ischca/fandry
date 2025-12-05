@@ -7,18 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Link, useLocation } from "wouter";
 import { Heart, Crown, AlertCircle, Check } from "lucide-react";
 import { toast } from "sonner";
-
-const CATEGORIES = [
-  { value: "illustration", label: "イラスト" },
-  { value: "manga", label: "漫画" },
-  { value: "cosplay", label: "コスプレ" },
-  { value: "photo", label: "写真" },
-  { value: "video", label: "動画" },
-  { value: "music", label: "音楽" },
-  { value: "vtuber", label: "VTuber" },
-  { value: "game", label: "ゲーム" },
-  { value: "other", label: "その他" },
-];
+import { CREATOR_CATEGORIES } from "@shared/const";
 
 export default function BecomeCreator() {
   const { isAuthenticated } = useAuth();
@@ -206,7 +195,7 @@ export default function BecomeCreator() {
                 className="w-full px-4 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">選択してください</option>
-                {CATEGORIES.map((cat) => (
+                {CREATOR_CATEGORIES.map((cat) => (
                   <option key={cat.value} value={cat.value}>
                     {cat.label}
                   </option>

@@ -7,7 +7,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        "bg-card/80 backdrop-blur-sm text-card-foreground flex flex-col gap-6 rounded-2xl border border-border/60 py-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-border",
         className
       )}
       {...props}
@@ -32,7 +32,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
+      className={cn("leading-none font-semibold tracking-tight", className)}
       {...props}
     />
   );
@@ -42,7 +42,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-muted-foreground text-sm leading-relaxed", className)}
       {...props}
     />
   );
@@ -81,6 +81,34 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+// Interactive card variant with hover effects
+function CardInteractive({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card"
+      className={cn(
+        "bg-card/80 backdrop-blur-sm text-card-foreground flex flex-col gap-6 rounded-2xl border border-border/60 py-6 shadow-sm card-interactive cursor-pointer",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+// Glass card variant
+function CardGlass({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card"
+      className={cn(
+        "glass-card text-card-foreground flex flex-col gap-6 rounded-2xl py-6 shadow-lg",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
 export {
   Card,
   CardHeader,
@@ -89,4 +117,6 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+  CardInteractive,
+  CardGlass,
 };

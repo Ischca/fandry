@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe, MoreHorizontal, Flag, Ban, Copy, Check, Link as LinkIcon } from "lucide-react";
+import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe, MoreHorizontal, Flag, Ban, Copy, Check, Link as LinkIcon, Users, Sparkles, Crown } from "lucide-react";
 import { useParams, Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { TipDialog } from "@/components/TipDialog";
@@ -56,7 +56,6 @@ export default function CreatorPage() {
     { enabled: isAuthenticated && !!creator }
   );
 
-  // ブロック状態を取得（creatorのuserIdを使う）
   const { data: blockData } = trpc.block.check.useQuery(
     { userId: creator?.userId || 0 },
     { enabled: isAuthenticated && !!creator }
@@ -83,16 +82,14 @@ export default function CreatorPage() {
 
   const isBlocked = blockData?.blocked || false;
 
-  const { data: plans, isLoading: plansLoading } = trpc.subscriptionPlan.getByCreatorId.useQuery(
+  const { data: plans } = trpc.subscriptionPlan.getByCreatorId.useQuery(
     { creatorId: creator?.id || 0 },
     { enabled: !!creator }
   );
 
   const followMutation = trpc.follow.toggle.useMutation({
     onSuccess: () => {
-      // Refetch follow status
       trpc.useUtils().follow.check.invalidate({ creatorId: creator?.id || 0 });
-      // Refetch creator data to update follower count
       trpc.useUtils().creator.getByUsername.invalidate({ username: username || "" });
     },
   });
@@ -106,19 +103,27 @@ export default function CreatorPage() {
 
   if (creatorLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">読み込み中...</p>
+      <div className="min-h-screen flex items-center justify-center hero-gradient">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground font-medium">読み込み中...</p>
+        </div>
       </div>
     );
   }
 
   if (!creator) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <User className="h-16 w-16 text-muted-foreground" />
-        <h1 className="text-2xl font-bold">クリエイターが見つかりません</h1>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 hero-gradient">
+        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
+          <User className="h-12 w-12 text-muted-foreground" />
+        </div>
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold">クリエイターが見つかりません</h1>
+          <p className="text-muted-foreground">URLを確認してください</p>
+        </div>
         <Link href="/discover">
-          <Button>クリエイターを探す</Button>
+          <Button size="lg" className="shine-effect">クリエイターを探す</Button>
         </Link>
       </div>
     );
@@ -126,82 +131,228 @@ export default function CreatorPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      {/* Header */}
+      <header className="border-b border-border/50 bg-card/30 backdrop-blur-xl sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="h-6 w-6 text-primary fill-primary" />
-            <span className="text-xl font-bold">Fandry</span>
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="relative">
+              <Heart className="h-7 w-7 text-primary fill-primary transition-transform group-hover:scale-110" />
+            </div>
+            <span className="text-xl font-bold tracking-tight">Fandry</span>
           </Link>
-          <nav className="flex items-center gap-4">
+          <nav className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
                 <Link href="/feed">
-                  <Button variant="ghost">フィード</Button>
+                  <Button variant="ghost" className="font-medium">フィード</Button>
                 </Link>
                 <Link href="/my">
-                  <Button variant="ghost">マイページ</Button>
+                  <Button variant="ghost" className="font-medium">マイページ</Button>
                 </Link>
               </>
             ) : (
               <a href={getLoginUrl()}>
-                <Button variant="default">ログイン</Button>
+                <Button className="shine-effect font-medium">ログイン</Button>
               </a>
             )}
           </nav>
         </div>
       </header>
 
-      {creator.coverUrl && (
-        <div className="w-full h-48 md:h-64 bg-gradient-to-br from-primary/20 to-accent/20">
-          <img src={creator.coverUrl} alt="Cover" className="w-full h-full object-cover" />
-        </div>
-      )}
+      {/* Cover Image / Gradient */}
+      <div className="relative w-full h-56 md:h-72 overflow-hidden">
+        {creator.coverUrl ? (
+          <img
+            src={creator.coverUrl}
+            alt="Cover"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-[oklch(0.85_0.16_85)]/20" />
+        )}
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+      </div>
 
-      <div className="container py-8">
-        <div className="flex flex-col md:flex-row gap-6 items-start">
-          <div className="relative -mt-16 md:-mt-20">
-            <div className="w-32 h-32 rounded-full border-4 border-background bg-muted flex items-center justify-center overflow-hidden">
+      {/* Profile Section */}
+      <div className="container relative">
+        <div className="flex flex-col md:flex-row gap-6 -mt-20 md:-mt-24">
+          {/* Avatar */}
+          <div className="relative z-10">
+            <div className="w-36 h-36 md:w-44 md:h-44 rounded-2xl border-4 border-background bg-card shadow-xl overflow-hidden">
               {creator.avatarUrl ? (
-                <img src={creator.avatarUrl} alt={creator.displayName} className="w-full h-full object-cover" />
+                <img
+                  src={creator.avatarUrl}
+                  alt={creator.displayName}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <User className="h-16 w-16 text-muted-foreground" />
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                  <User className="h-16 w-16 text-primary" />
+                </div>
               )}
             </div>
           </div>
 
-          <div className="flex-1 space-y-4">
-            <div>
-              <h1 className="text-3xl font-bold">{creator.displayName}</h1>
-              <p className="text-muted-foreground">@{creator.username}</p>
+          {/* Profile Info */}
+          <div className="flex-1 pt-4 md:pt-20 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div className="space-y-2">
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{creator.displayName}</h1>
+                <p className="text-muted-foreground text-lg">@{creator.username}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-wrap gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="border-2">
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleCopyTipLink}>
+                      {copied ? (
+                        <Check className="h-4 w-4 mr-2 text-green-500" />
+                      ) : (
+                        <LinkIcon className="h-4 w-4 mr-2" />
+                      )}
+                      チップリンクをコピー
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        toast.success("ページリンクをコピーしました");
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      ページリンクをコピー
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {isAuthenticated ? (
+                  <>
+                    <Button
+                      variant={isFollowing ? "secondary" : "outline"}
+                      onClick={handleFollowToggle}
+                      disabled={followMutation.isPending}
+                      className="border-2 font-semibold"
+                    >
+                      {isFollowing ? "フォロー中" : "フォロー"}
+                    </Button>
+                    <Button
+                      onClick={() => setTipDialogOpen(true)}
+                      className="shine-effect gap-2 font-semibold"
+                    >
+                      <Heart className="h-4 w-4" />
+                      応援する
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" className="border-2">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={handleBlockToggle}
+                          disabled={blockMutation.isPending}
+                        >
+                          <Ban className="h-4 w-4 mr-2" />
+                          {isBlocked ? "ブロック解除" : "ブロック"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setReportDialogOpen(true)}
+                          className="text-destructive"
+                        >
+                          <Flag className="h-4 w-4 mr-2" />
+                          通報する
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                ) : (
+                  <a href={getLoginUrl()}>
+                    <Button className="shine-effect gap-2 font-semibold">
+                      <Heart className="h-4 w-4" />
+                      応援する
+                    </Button>
+                  </a>
+                )}
+              </div>
             </div>
-            {creator.bio && <p className="text-foreground">{creator.bio}</p>}
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>{creator.followerCount} フォロワー</span>
-              {creator.category && <span className="px-3 py-1 rounded-full bg-accent/20">{creator.category}</span>}
+
+            {/* Bio */}
+            {creator.bio && (
+              <p className="text-foreground leading-relaxed max-w-2xl">{creator.bio}</p>
+            )}
+
+            {/* Stats & Category */}
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Users className="h-4 w-4" />
+                <span className="font-semibold text-foreground">{creator.followerCount.toLocaleString()}</span>
+                <span>フォロワー</span>
+              </div>
+              {creator.totalSupport > 0 && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="font-semibold text-foreground">¥{creator.totalSupport.toLocaleString()}</span>
+                  <span>総支援額</span>
+                </div>
+              )}
+              {creator.category && (
+                <span className="px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-sm font-medium">
+                  {creator.category}
+                </span>
+              )}
             </div>
+
+            {/* Social Links */}
             {creator.socialLinks && (() => {
               try {
                 const links = JSON.parse(creator.socialLinks);
                 if (Object.keys(links).length === 0) return null;
                 return (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {links.twitter && (
-                      <a href={links.twitter} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                      <a
+                        href={links.twitter}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                      >
                         <Twitter className="h-5 w-5" />
                       </a>
                     )}
                     {links.instagram && (
-                      <a href={links.instagram} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                      <a
+                        href={links.instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                      >
                         <Instagram className="h-5 w-5" />
                       </a>
                     )}
                     {links.youtube && (
-                      <a href={links.youtube} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                      <a
+                        href={links.youtube}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                      >
                         <Youtube className="h-5 w-5" />
                       </a>
                     )}
                     {links.website && (
-                      <a href={links.website} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                      <a
+                        href={links.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                      >
                         <Globe className="h-5 w-5" />
                       </a>
                     )}
@@ -212,89 +363,21 @@ export default function CreatorPage() {
               }
             })()}
           </div>
-
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleCopyTipLink}>
-                  {copied ? (
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                  ) : (
-                    <LinkIcon className="h-4 w-4 mr-2" />
-                  )}
-                  チップリンクをコピー
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast.success("ページリンクをコピーしました");
-                  }}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  ページリンクをコピー
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {isAuthenticated ? (
-              <>
-                <Button
-                  variant={isFollowing ? "default" : "outline"}
-                  onClick={handleFollowToggle}
-                  disabled={followMutation.isPending}
-                >
-                  {isFollowing ? "フォロー中" : "フォロー"}
-                </Button>
-                <Button className="gap-2" onClick={() => setTipDialogOpen(true)}>
-                  <Heart className="h-4 w-4" />
-                  応援する
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={handleBlockToggle}
-                      disabled={blockMutation.isPending}
-                    >
-                      <Ban className="h-4 w-4 mr-2" />
-                      {isBlocked ? "ブロック解除" : "ブロック"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setReportDialogOpen(true)}
-                      className="text-destructive"
-                    >
-                      <Flag className="h-4 w-4 mr-2" />
-                      通報する
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            ) : (
-              <a href={getLoginUrl()}>
-                <Button className="gap-2">
-                  <Heart className="h-4 w-4" />
-                  応援する
-                </Button>
-              </a>
-            )}
-          </div>
         </div>
       </div>
 
-      <div className="container py-8 space-y-12">
-        {/* 月額支援プラン */}
+      {/* Content */}
+      <div className="container py-12 space-y-12">
+        {/* Subscription Plans */}
         {plans && plans.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-xl font-bold">月額支援プラン</h2>
-            <div className="grid gap-3 md:grid-cols-3">
+          <section className="space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-[oklch(0.85_0.16_85)]/10">
+                <Crown className="h-5 w-5 text-[oklch(0.75_0.14_85)]" />
+              </div>
+              <h2 className="text-2xl font-bold">月額支援プラン</h2>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
               {plans.map((plan) => {
                 let benefits: string[] = [];
                 try {
@@ -303,69 +386,91 @@ export default function CreatorPage() {
                   benefits = [];
                 }
                 return (
-                  <Card key={plan.id} className="p-4 space-y-3 hover:shadow-md transition-shadow">
+                  <Card
+                    key={plan.id}
+                    className="p-6 space-y-4 card-interactive cursor-pointer"
+                    onClick={() => setSubscribeDialogOpen(true)}
+                  >
                     <div className="flex items-baseline justify-between">
-                      <h3 className="font-bold">{plan.name}</h3>
-                      <p className="text-lg font-bold">￥{plan.price.toLocaleString()}<span className="text-xs font-normal text-muted-foreground">/月</span></p>
+                      <h3 className="font-bold text-lg">{plan.name}</h3>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-primary">¥{plan.price.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">/月</p>
+                      </div>
                     </div>
                     {plan.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">{plan.description}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{plan.description}</p>
                     )}
                     {benefits.length > 0 && (
-                      <ul className="space-y-1 text-xs">
+                      <ul className="space-y-2 text-sm">
                         {benefits.slice(0, 3).map((benefit, i) => (
-                          <li key={i} className="flex items-start gap-1.5">
-                            <span className="text-primary mt-0.5 text-xs">✓</span>
+                          <li key={i} className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                             <span className="line-clamp-1">{benefit}</span>
                           </li>
                         ))}
                         {benefits.length > 3 && (
-                          <li className="text-muted-foreground">+{benefits.length - 3}件の特典</li>
+                          <li className="text-muted-foreground pl-6">
+                            +{benefits.length - 3}件の特典
+                          </li>
                         )}
                       </ul>
                     )}
-                    <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
                       <p className="text-xs text-muted-foreground">
                         {plan.subscriberCount}人が加入中
                       </p>
-                      <Button size="sm" onClick={() => setSubscribeDialogOpen(true)}>
-                        加入
+                      <Button size="sm" className="font-semibold">
+                        加入する
                       </Button>
                     </div>
                   </Card>
                 );
               })}
             </div>
-          </div>
+          </section>
         )}
 
-        <div>
-        <h2 className="text-2xl font-bold mb-6">投稿</h2>
-        {postsLoading ? (
-          <p className="text-muted-foreground">読み込み中...</p>
-        ) : posts && posts.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={{
-                  ...post,
-                  creator: {
-                    id: creator.id,
-                    username: creator.username,
-                    displayName: creator.displayName,
-                    avatarUrl: creator.avatarUrl,
-                  },
-                }}
-              />
-            ))}
+        {/* Posts */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold">投稿</h2>
           </div>
-        ) : (
-          <p className="text-muted-foreground">まだ投稿がありません</p>
-        )}
-        </div>
+          {postsLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : posts && posts.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={{
+                    ...post,
+                    creator: {
+                      id: creator.id,
+                      username: creator.username,
+                      displayName: creator.displayName,
+                      avatarUrl: creator.avatarUrl,
+                    },
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 text-muted-foreground">
+              <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-30" />
+              <p className="text-lg font-medium">まだ投稿がありません</p>
+              <p className="text-sm mt-1">最初の投稿を楽しみにお待ちください</p>
+            </div>
+          )}
+        </section>
       </div>
-      
+
+      {/* Dialogs */}
       {isAuthenticated && (
         <>
           <TipDialog

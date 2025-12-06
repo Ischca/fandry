@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
+    "dev": "NODE_ENV=development tsx watch --ignore \"**/*.build-*.mjs\" --ignore \"**/node_modules/**\" server/_core/index.ts",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
@@ -81,6 +81,8 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^13.0.0",
     "vaul": "^1.1.2",
+    "vike": "^0.4.247",
+    "vike-react": "^0.6.13",
     "wouter": "^3.3.5",
     "zod": "^4.1.12"
   },

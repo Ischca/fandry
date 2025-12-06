@@ -55,7 +55,7 @@ async function startServer() {
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    await serveStatic(app);
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000");

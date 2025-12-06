@@ -1,13 +1,21 @@
 import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import vike from "vike/plugin";
 import fs from "node:fs";
 import path from "path";
 import { defineConfig } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime()];
+const plugins = [
+  react(),
+  tailwindcss(),
+  vike(), // Vike設定は +config.ts で管理
+  // Note: These plugins are disabled for Vike compatibility
+  // jsxLocPlugin(),
+  // vitePluginManusRuntime(),
+];
 
 export default defineConfig({
   plugins,
@@ -24,6 +32,36 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // React core
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+            return "vendor-react";
+          }
+          // Clerk authentication
+          if (id.includes("node_modules/@clerk/")) {
+            return "vendor-clerk";
+          }
+          // tRPC and React Query
+          if (id.includes("node_modules/@trpc/") || id.includes("node_modules/@tanstack/")) {
+            return "vendor-trpc";
+          }
+          // Radix UI components
+          if (id.includes("node_modules/@radix-ui/")) {
+            return "vendor-radix";
+          }
+          // Lucide icons
+          if (id.includes("node_modules/lucide-react/")) {
+            return "vendor-icons";
+          }
+          // Other large libraries
+          if (id.includes("node_modules/superjson/") || id.includes("node_modules/zod/")) {
+            return "vendor-utils";
+          }
+        },
+      },
+    },
   },
   server: {
     host: true,

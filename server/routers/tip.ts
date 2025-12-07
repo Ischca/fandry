@@ -13,6 +13,10 @@ import {
   pointTransactions,
   assertDb,
   assertFound,
+  createAuditLog,
+  completeAuditLog,
+  failAuditLog,
+  getOrGenerateIdempotencyKey,
 } from "./_shared";
 import { getTipsByCreatorId } from "../db";
 import Stripe from "stripe";
@@ -122,6 +126,7 @@ export const tipRouter = router({
       creatorId: z.number(),
       amount: z.number().min(100),
       message: z.string().max(500).optional(),
+      idempotencyKey: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -141,33 +146,67 @@ export const tipRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "ポイント残高が不足しています" });
       }
 
-      // Create tip record
-      const [tip] = await db.insert(tips).values({
-        userId: ctx.user.id,
-        creatorId: input.creatorId,
-        amount: input.amount,
-        message: input.message,
-        isRecurring: 0,
-        paymentMethod: "points",
-        pointsUsed: input.amount,
-        stripeAmount: 0,
-      }).returning();
-
-      // Deduct points
-      const newBalance = await deductPoints(
-        db,
+      // Generate idempotency key
+      const idemKey = getOrGenerateIdempotencyKey(
+        input.idempotencyKey,
+        "tip_points",
         ctx.user.id,
-        input.amount,
-        tip.id,
-        `チップ: ${creator.displayName}`
+        input.creatorId,
+        input.amount
       );
 
-      // Update creator's total support
-      await db.update(creators)
-        .set({ totalSupport: sql`${creators.totalSupport} + ${input.amount}` })
-        .where(eq(creators.id, input.creatorId));
+      // Create audit log
+      const auditLogId = await createAuditLog({
+        operationType: "tip_points",
+        userId: ctx.user.id,
+        creatorId: input.creatorId,
+        totalAmount: input.amount,
+        pointsAmount: input.amount,
+        idempotencyKey: idemKey,
+      });
 
-      return { success: true, tipId: tip.id, newBalance };
+      try {
+        // Create tip record
+        const [tip] = await db.insert(tips).values({
+          userId: ctx.user.id,
+          creatorId: input.creatorId,
+          amount: input.amount,
+          message: input.message,
+          isRecurring: 0,
+          paymentMethod: "points",
+          pointsUsed: input.amount,
+          stripeAmount: 0,
+          idempotencyKey: idemKey,
+        }).returning();
+
+        // Deduct points
+        const newBalance = await deductPoints(
+          db,
+          ctx.user.id,
+          input.amount,
+          tip.id,
+          `チップ: ${creator.displayName}`
+        );
+
+        // Update creator's total support
+        await db.update(creators)
+          .set({ totalSupport: sql`${creators.totalSupport} + ${input.amount}` })
+          .where(eq(creators.id, input.creatorId));
+
+        // Complete audit log
+        await completeAuditLog(auditLogId, {
+          referenceType: "tip",
+          referenceId: tip.id,
+        });
+
+        return { success: true, tipId: tip.id, newBalance };
+      } catch (error) {
+        await failAuditLog(auditLogId, {
+          code: error instanceof TRPCError ? error.code : "UNKNOWN",
+          message: error instanceof Error ? error.message : "Unknown error",
+        }, false);
+        throw error;
+      }
     }),
 
   // Create Stripe checkout for tip
@@ -178,6 +217,7 @@ export const tipRouter = router({
       message: z.string().max(500).optional(),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
+      idempotencyKey: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -198,36 +238,65 @@ export const tipRouter = router({
         });
       }
 
-      const stripe = getStripe();
+      // Generate idempotency key
+      const idemKey = getOrGenerateIdempotencyKey(
+        input.idempotencyKey,
+        "tip_stripe",
+        ctx.user.id,
+        input.creatorId,
+        input.amount
+      );
 
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: "jpy",
-              product_data: {
-                name: `${creator.displayName}へのチップ`,
-                description: input.message || "応援ありがとうございます！",
-              },
-              unit_amount: input.amount,
-            },
-            quantity: 1,
-          },
-        ],
-        metadata: {
-          userId: ctx.user.id.toString(),
-          creatorId: input.creatorId.toString(),
-          amount: input.amount.toString(),
-          message: input.message || "",
-          type: "tip",
-        },
-        success_url: input.successUrl,
-        cancel_url: input.cancelUrl,
+      // Create audit log (pending state - will be completed by webhook)
+      const auditLogId = await createAuditLog({
+        operationType: "tip_stripe",
+        userId: ctx.user.id,
+        creatorId: input.creatorId,
+        totalAmount: input.amount,
+        stripeAmount: input.amount,
+        idempotencyKey: idemKey,
       });
 
-      return { sessionId: session.id, url: session.url };
+      try {
+        const stripe = getStripe();
+
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "jpy",
+                product_data: {
+                  name: `${creator.displayName}へのチップ`,
+                  description: input.message || "応援ありがとうございます！",
+                },
+                unit_amount: input.amount,
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: {
+            userId: ctx.user.id.toString(),
+            creatorId: input.creatorId.toString(),
+            amount: input.amount.toString(),
+            message: input.message || "",
+            type: "tip",
+            auditLogId: auditLogId.toString(),
+            idempotencyKey: idemKey,
+          },
+          success_url: input.successUrl,
+          cancel_url: input.cancelUrl,
+        });
+
+        return { sessionId: session.id, url: session.url };
+      } catch (error) {
+        await failAuditLog(auditLogId, {
+          code: "STRIPE_ERROR",
+          message: error instanceof Error ? error.message : "Stripe error",
+        }, false);
+        throw error;
+      }
     }),
 
   // Create hybrid tip (points + Stripe)
@@ -239,6 +308,7 @@ export const tipRouter = router({
       message: z.string().max(500).optional(),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
+      idempotencyKey: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -271,68 +341,121 @@ export const tipRouter = router({
 
       const stripeAmount = input.amount - input.pointsToUse;
 
+      // Generate idempotency key
+      const idemKey = getOrGenerateIdempotencyKey(
+        input.idempotencyKey,
+        stripeAmount === 0 ? "tip_points" : "tip_hybrid",
+        ctx.user.id,
+        input.creatorId,
+        input.amount
+      );
+
       // If all points cover the amount, just do points tip
       if (stripeAmount === 0) {
-        const [tip] = await db.insert(tips).values({
+        const auditLogId = await createAuditLog({
+          operationType: "tip_points",
           userId: ctx.user.id,
           creatorId: input.creatorId,
-          amount: input.amount,
-          message: input.message,
-          isRecurring: 0,
-          paymentMethod: "points",
-          pointsUsed: input.amount,
-          stripeAmount: 0,
-        }).returning();
+          totalAmount: input.amount,
+          pointsAmount: input.amount,
+          idempotencyKey: idemKey,
+        });
 
-        const newBalance = await deductPoints(
-          db,
-          ctx.user.id,
-          input.amount,
-          tip.id,
-          `チップ: ${creator.displayName}`
-        );
+        try {
+          const [tip] = await db.insert(tips).values({
+            userId: ctx.user.id,
+            creatorId: input.creatorId,
+            amount: input.amount,
+            message: input.message,
+            isRecurring: 0,
+            paymentMethod: "points",
+            pointsUsed: input.amount,
+            stripeAmount: 0,
+            idempotencyKey: idemKey,
+          }).returning();
 
-        await db.update(creators)
-          .set({ totalSupport: sql`${creators.totalSupport} + ${input.amount}` })
-          .where(eq(creators.id, input.creatorId));
+          const newBalance = await deductPoints(
+            db,
+            ctx.user.id,
+            input.amount,
+            tip.id,
+            `チップ: ${creator.displayName}`
+          );
 
-        return { success: true, tipId: tip.id, newBalance, requiresStripe: false };
+          await db.update(creators)
+            .set({ totalSupport: sql`${creators.totalSupport} + ${input.amount}` })
+            .where(eq(creators.id, input.creatorId));
+
+          await completeAuditLog(auditLogId, {
+            referenceType: "tip",
+            referenceId: tip.id,
+          });
+
+          return { success: true, tipId: tip.id, newBalance, requiresStripe: false };
+        } catch (error) {
+          await failAuditLog(auditLogId, {
+            code: error instanceof TRPCError ? error.code : "UNKNOWN",
+            message: error instanceof Error ? error.message : "Unknown error",
+          }, false);
+          throw error;
+        }
       }
 
-      const stripe = getStripe();
-
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: "jpy",
-              product_data: {
-                name: `${creator.displayName}へのチップ`,
-                description: input.message
-                  ? `${input.message}（${input.pointsToUse}pt割引適用）`
-                  : `応援ありがとう！（${input.pointsToUse}pt割引適用）`,
-              },
-              unit_amount: stripeAmount,
-            },
-            quantity: 1,
-          },
-        ],
-        metadata: {
-          userId: ctx.user.id.toString(),
-          creatorId: input.creatorId.toString(),
-          totalAmount: input.amount.toString(),
-          pointsUsed: input.pointsToUse.toString(),
-          stripeAmount: stripeAmount.toString(),
-          message: input.message || "",
-          type: "tip_hybrid",
-        },
-        success_url: input.successUrl,
-        cancel_url: input.cancelUrl,
+      // Create audit log for hybrid tip
+      const auditLogId = await createAuditLog({
+        operationType: "tip_hybrid",
+        userId: ctx.user.id,
+        creatorId: input.creatorId,
+        totalAmount: input.amount,
+        pointsAmount: input.pointsToUse,
+        stripeAmount: stripeAmount,
+        idempotencyKey: idemKey,
       });
 
-      return { sessionId: session.id, url: session.url, requiresStripe: true };
+      try {
+        const stripe = getStripe();
+
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "jpy",
+                product_data: {
+                  name: `${creator.displayName}へのチップ`,
+                  description: input.message
+                    ? `${input.message}（${input.pointsToUse}pt割引適用）`
+                    : `応援ありがとう！（${input.pointsToUse}pt割引適用）`,
+                },
+                unit_amount: stripeAmount,
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: {
+            userId: ctx.user.id.toString(),
+            creatorId: input.creatorId.toString(),
+            totalAmount: input.amount.toString(),
+            pointsUsed: input.pointsToUse.toString(),
+            stripeAmount: stripeAmount.toString(),
+            message: input.message || "",
+            type: "tip_hybrid",
+            auditLogId: auditLogId.toString(),
+            idempotencyKey: idemKey,
+          },
+          success_url: input.successUrl,
+          cancel_url: input.cancelUrl,
+        });
+
+        return { sessionId: session.id, url: session.url, requiresStripe: true };
+      } catch (error) {
+        await failAuditLog(auditLogId, {
+          code: "STRIPE_ERROR",
+          message: error instanceof Error ? error.message : "Stripe error",
+        }, false);
+        throw error;
+      }
     }),
 
   getByCreatorId: publicProcedure

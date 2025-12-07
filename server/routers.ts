@@ -21,6 +21,7 @@ import {
   withdrawalRouter,
   receiptRouter,
   notificationRouter,
+  adminPaymentRouter,
 } from "./routers/index";
 
 export const appRouter = router({
@@ -49,6 +50,7 @@ export const appRouter = router({
   withdrawal: withdrawalRouter,
   receipt: receiptRouter,
   notification: notificationRouter,
+  adminPayment: adminPaymentRouter,
 });
 
 export type AppRouter = typeof appRouter;

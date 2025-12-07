@@ -3,7 +3,22 @@ import Stripe from "stripe";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq, sql } from "drizzle-orm";
-import { userPoints, pointTransactions, purchases, creators, posts, subscriptions, subscriptionPlans, tips } from "../../drizzle/schema";
+import {
+  userPoints,
+  pointTransactions,
+  purchases,
+  creators,
+  posts,
+  subscriptions,
+  subscriptionPlans,
+  tips,
+  paymentAuditLogs,
+} from "../../drizzle/schema";
+import {
+  completeAuditLog,
+  failAuditLog,
+  markForRecovery,
+} from "../lib/auditLogger";
 
 const router = Router();
 
@@ -411,6 +426,7 @@ router.post(
         if (type === "point_purchase") {
           const userId = parseInt(session.metadata?.userId || "0");
           const points = parseInt(session.metadata?.points || "0");
+          const auditLogId = session.metadata?.auditLogId ? parseInt(session.metadata.auditLogId) : null;
 
           if (userId && points) {
             const success = await creditPoints(
@@ -419,8 +435,23 @@ router.post(
               paymentIntentId,
               `${points}ポイント購入`
             );
-            if (!success) {
+            if (success) {
+              // Complete audit log
+              if (auditLogId) {
+                await completeAuditLog(auditLogId, {
+                  referenceType: "point_transaction",
+                  stripePaymentIntentId: paymentIntentId,
+                });
+              }
+            } else {
               console.error(`Failed to credit points for session ${session.id}`);
+              // Mark for recovery
+              if (auditLogId) {
+                await failAuditLog(auditLogId, {
+                  code: "WEBHOOK_PROCESSING_FAILED",
+                  message: "Failed to credit points after successful payment",
+                }, true);
+              }
             }
           }
         }
@@ -430,6 +461,7 @@ router.post(
           const userId = parseInt(session.metadata?.userId || "0");
           const postId = parseInt(session.metadata?.postId || "0");
           const amount = parseInt(session.metadata?.amount || "0");
+          const auditLogId = session.metadata?.auditLogId ? parseInt(session.metadata.auditLogId) : null;
 
           if (userId && postId && amount) {
             const success = await completePostPurchase(
@@ -438,8 +470,21 @@ router.post(
               amount,
               paymentIntentId
             );
-            if (!success) {
+            if (success) {
+              if (auditLogId) {
+                await completeAuditLog(auditLogId, {
+                  referenceType: "purchase",
+                  stripePaymentIntentId: paymentIntentId,
+                });
+              }
+            } else {
               console.error(`Failed to complete post purchase for session ${session.id}`);
+              if (auditLogId) {
+                await failAuditLog(auditLogId, {
+                  code: "WEBHOOK_PROCESSING_FAILED",
+                  message: "Failed to complete post purchase after successful payment",
+                }, true);
+              }
             }
           }
         }
@@ -451,6 +496,7 @@ router.post(
           const totalAmount = parseInt(session.metadata?.totalAmount || "0");
           const pointsUsed = parseInt(session.metadata?.pointsUsed || "0");
           const stripeAmount = parseInt(session.metadata?.stripeAmount || "0");
+          const auditLogId = session.metadata?.auditLogId ? parseInt(session.metadata.auditLogId) : null;
 
           if (userId && postId && totalAmount) {
             const success = await completeHybridPurchase(
@@ -461,8 +507,23 @@ router.post(
               stripeAmount,
               paymentIntentId
             );
-            if (!success) {
+            if (success) {
+              if (auditLogId) {
+                await completeAuditLog(auditLogId, {
+                  referenceType: "purchase",
+                  stripePaymentIntentId: paymentIntentId,
+                });
+              }
+            } else {
               console.error(`Failed to complete hybrid purchase for session ${session.id}`);
+              // This is critical - points may have been deducted but purchase not recorded
+              if (auditLogId) {
+                await failAuditLog(auditLogId, {
+                  code: "WEBHOOK_PROCESSING_FAILED",
+                  message: "Failed to complete hybrid purchase - points may need recovery",
+                  details: { userId, postId, pointsUsed, stripeAmount },
+                }, true);
+              }
             }
           }
         }
@@ -493,6 +554,7 @@ router.post(
           const creatorId = parseInt(session.metadata?.creatorId || "0");
           const amount = parseInt(session.metadata?.amount || "0");
           const message = session.metadata?.message || "";
+          const auditLogId = session.metadata?.auditLogId ? parseInt(session.metadata.auditLogId) : null;
 
           if (userId && creatorId && amount) {
             const success = await completeTip(
@@ -502,8 +564,21 @@ router.post(
               message,
               paymentIntentId
             );
-            if (!success) {
+            if (success) {
+              if (auditLogId) {
+                await completeAuditLog(auditLogId, {
+                  referenceType: "tip",
+                  stripePaymentIntentId: paymentIntentId,
+                });
+              }
+            } else {
               console.error(`Failed to complete tip for session ${session.id}`);
+              if (auditLogId) {
+                await failAuditLog(auditLogId, {
+                  code: "WEBHOOK_PROCESSING_FAILED",
+                  message: "Failed to complete tip after successful payment",
+                }, true);
+              }
             }
           }
         }
@@ -516,6 +591,7 @@ router.post(
           const pointsUsed = parseInt(session.metadata?.pointsUsed || "0");
           const stripeAmount = parseInt(session.metadata?.stripeAmount || "0");
           const message = session.metadata?.message || "";
+          const auditLogId = session.metadata?.auditLogId ? parseInt(session.metadata.auditLogId) : null;
 
           if (userId && creatorId && totalAmount) {
             const success = await completeHybridTip(
@@ -527,8 +603,22 @@ router.post(
               message,
               paymentIntentId
             );
-            if (!success) {
+            if (success) {
+              if (auditLogId) {
+                await completeAuditLog(auditLogId, {
+                  referenceType: "tip",
+                  stripePaymentIntentId: paymentIntentId,
+                });
+              }
+            } else {
               console.error(`Failed to complete hybrid tip for session ${session.id}`);
+              if (auditLogId) {
+                await failAuditLog(auditLogId, {
+                  code: "WEBHOOK_PROCESSING_FAILED",
+                  message: "Failed to complete hybrid tip - points may need recovery",
+                  details: { userId, creatorId, pointsUsed, stripeAmount },
+                }, true);
+              }
             }
           }
         }

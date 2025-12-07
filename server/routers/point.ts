@@ -10,6 +10,10 @@ import {
   userPoints,
   pointTransactions,
   pointPackages,
+  createAuditLog,
+  completeAuditLog,
+  failAuditLog,
+  getOrGenerateIdempotencyKey,
 } from "./_shared";
 import Stripe from "stripe";
 
@@ -83,6 +87,7 @@ export const pointRouter = router({
       packageId: z.number(),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
+      idempotencyKey: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -100,36 +105,63 @@ export const pointRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Package not found" });
       }
 
-      const stripe = getStripe();
+      // Generate idempotency key
+      const idemKey = getOrGenerateIdempotencyKey(
+        input.idempotencyKey,
+        "point_purchase",
+        ctx.user.id,
+        input.packageId
+      );
 
-      // Create checkout session
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: "jpy",
-              product_data: {
-                name: pkg.name,
-                description: `${pkg.points}ポイント`,
-              },
-              unit_amount: pkg.priceJpy,
-            },
-            quantity: 1,
-          },
-        ],
-        metadata: {
-          userId: ctx.user.id.toString(),
-          packageId: pkg.id.toString(),
-          points: pkg.points.toString(),
-          type: "point_purchase",
-        },
-        success_url: input.successUrl,
-        cancel_url: input.cancelUrl,
+      // Create audit log (pending state - will be completed by webhook)
+      const auditLogId = await createAuditLog({
+        operationType: "point_purchase",
+        userId: ctx.user.id,
+        totalAmount: pkg.priceJpy,
+        stripeAmount: pkg.priceJpy,
+        idempotencyKey: idemKey,
       });
 
-      return { sessionId: session.id, url: session.url };
+      try {
+        const stripe = getStripe();
+
+        // Create checkout session
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "jpy",
+                product_data: {
+                  name: pkg.name,
+                  description: `${pkg.points}ポイント`,
+                },
+                unit_amount: pkg.priceJpy,
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: {
+            userId: ctx.user.id.toString(),
+            packageId: pkg.id.toString(),
+            points: pkg.points.toString(),
+            type: "point_purchase",
+            auditLogId: auditLogId.toString(),
+            idempotencyKey: idemKey,
+          },
+          success_url: input.successUrl,
+          cancel_url: input.cancelUrl,
+        });
+
+        return { sessionId: session.id, url: session.url };
+      } catch (error) {
+        await failAuditLog(auditLogId, {
+          code: "STRIPE_ERROR",
+          message: error instanceof Error ? error.message : "Stripe error",
+        }, false);
+        throw error;
+      }
     }),
 
   // Credit points to user (called after successful payment via webhook or manually for testing)

@@ -14,6 +14,16 @@ export const pointTransactionTypeEnum = pgEnum("point_transaction_type", [
 ]);
 
 /**
+ * Transaction Status enum - 取引ステータス
+ */
+export const transactionStatusEnum = pgEnum("transaction_status", [
+  "pending",     // 処理待ち
+  "completed",   // 完了
+  "failed",      // 失敗
+  "refunded",    // 返金済み
+]);
+
+/**
  * Core user table backing auth flow.
  * Extend this file with additional tables as your product grows.
  * Columns use camelCase to match both database fields and generated types.
@@ -133,6 +143,8 @@ export const subscriptions = pgTable("subscriptions", {
   startedAt: timestamp("started_at").defaultNow().notNull(),
   nextBillingAt: timestamp("next_billing_at"),
   cancelledAt: timestamp("cancelled_at"),
+  // トレーサビリティ拡張
+  idempotencyKey: varchar("idempotency_key", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -154,6 +166,9 @@ export const tips = pgTable("tips", {
   pointsUsed: integer("points_used").default(0),
   stripeAmount: integer("stripe_amount").default(0),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  // トレーサビリティ拡張
+  status: transactionStatusEnum("status").default("completed"), // 既存データ互換のためdefault="completed"
+  idempotencyKey: varchar("idempotency_key", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -172,6 +187,9 @@ export const purchases = pgTable("purchases", {
   pointsUsed: integer("points_used").default(0),
   stripeAmount: integer("stripe_amount").default(0),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  // トレーサビリティ拡張
+  status: transactionStatusEnum("status").default("completed"), // 既存データ互換のためdefault="completed"
+  idempotencyKey: varchar("idempotency_key", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -314,6 +332,9 @@ export const pointTransactions = pgTable("point_transactions", {
   referenceId: integer("reference_id"), // 関連するtip/purchase/subscription ID
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
   description: text("description"),
+  // トレーサビリティ拡張
+  status: transactionStatusEnum("status").default("completed"), // 既存データ互換のためdefault="completed"
+  idempotencyKey: varchar("idempotency_key", { length: 128 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -429,6 +450,43 @@ export const notificationTypeEnum = pgEnum("notification_type", [
 ]);
 
 /**
+ * Audit Operation Type enum - 監査ログ操作タイプ
+ */
+export const auditOperationTypeEnum = pgEnum("audit_operation_type", [
+  // ポイント関連
+  "point_purchase",        // ポイント購入
+  "point_refund",          // ポイント返金
+  // コンテンツ購入関連
+  "post_purchase_points",  // ポイントでの投稿購入
+  "post_purchase_stripe",  // Stripeでの投稿購入
+  "post_purchase_hybrid",  // ハイブリッド投稿購入
+  // サブスクリプション関連
+  "subscription_points",   // ポイントでのサブスク開始
+  "subscription_stripe",   // Stripeでのサブスク開始
+  "subscription_renewal",  // サブスク更新
+  "subscription_cancel",   // サブスクキャンセル
+  // チップ関連
+  "tip_points",            // ポイントでのチップ
+  "tip_stripe",            // Stripeでのチップ
+  "tip_hybrid",            // ハイブリッドチップ
+  // 管理者操作
+  "admin_point_grant",     // 管理者によるポイント付与
+  "admin_refund",          // 管理者による返金
+]);
+
+/**
+ * Audit Status enum - 監査ログステータス
+ */
+export const auditStatusEnum = pgEnum("audit_status", [
+  "pending",     // 処理開始
+  "processing",  // 処理中
+  "completed",   // 完了
+  "failed",      // 失敗
+  "refunded",    // 返金済み
+  "cancelled",   // キャンセル
+]);
+
+/**
  * Notifications table - 通知
  */
 export const notifications = pgTable("notifications", {
@@ -450,3 +508,68 @@ export const notifications = pgTable("notifications", {
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+
+/**
+ * Payment Audit Logs table - 課金監査ログ
+ * 全ての金融取引を一元的に記録し、復旧可能にする
+ */
+export const paymentAuditLogs = pgTable("payment_audit_logs", {
+  id: serial("id").primaryKey(),
+  // 操作識別
+  operationType: auditOperationTypeEnum("operation_type").notNull(),
+  status: auditStatusEnum("status").default("pending").notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 128 }),
+  // ユーザー情報
+  userId: integer("user_id").references(() => users.id),
+  creatorId: integer("creator_id").references(() => creators.id),
+  // 金額情報
+  totalAmount: integer("total_amount").notNull(), // 合計金額（円）
+  pointsAmount: integer("points_amount").default(0).notNull(), // ポイント使用額
+  stripeAmount: integer("stripe_amount").default(0).notNull(), // Stripe決済額
+  // 参照情報
+  referenceType: varchar("reference_type", { length: 32 }), // "purchase" | "tip" | "subscription" | "point_transaction"
+  referenceId: integer("reference_id"), // 該当レコードのID
+  // Stripe情報
+  stripeSessionId: varchar("stripe_session_id", { length: 256 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 256 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 256 }),
+  // エラー情報
+  errorCode: varchar("error_code", { length: 64 }),
+  errorMessage: text("error_message"),
+  errorDetails: text("error_details"), // JSON形式の詳細エラー情報
+  // 復旧情報
+  requiresRecovery: integer("requires_recovery").default(0).notNull(), // 手動復旧が必要か
+  recoveryAttempts: integer("recovery_attempts").default(0).notNull(),
+  recoveredAt: timestamp("recovered_at"),
+  recoveryNote: text("recovery_note"),
+  // 管理者情報
+  processedBy: integer("processed_by").references(() => users.id),
+  processedAt: timestamp("processed_at"),
+  adminNote: text("admin_note"),
+  // タイムスタンプ
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export type PaymentAuditLog = typeof paymentAuditLogs.$inferSelect;
+export type InsertPaymentAuditLog = typeof paymentAuditLogs.$inferInsert;
+
+/**
+ * Idempotency Keys table - 冪等性キー
+ * 重複取引防止用
+ */
+export const idempotencyKeys = pgTable("idempotency_keys", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 128 }).notNull().unique(),
+  operationType: varchar("operation_type", { length: 64 }).notNull(),
+  userId: integer("user_id").references(() => users.id),
+  status: varchar("status", { length: 16 }).default("pending").notNull(), // "pending" | "completed" | "failed"
+  resultData: text("result_data"), // キャッシュされた結果（JSON）
+  expiresAt: timestamp("expires_at").notNull(), // 24時間後に期限切れ
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type IdempotencyKey = typeof idempotencyKeys.$inferSelect;
+export type InsertIdempotencyKey = typeof idempotencyKeys.$inferInsert;

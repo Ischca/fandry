@@ -19,3 +19,4 @@ export { subscriptionRouter } from "./subscription";
 export { withdrawalRouter } from "./withdrawal";
 export { receiptRouter } from "./receipt";
 export { notificationRouter } from "./notification";
+export { adminPaymentRouter } from "./adminPayment";

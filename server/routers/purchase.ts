@@ -15,6 +15,10 @@ import {
   pointTransactions,
   assertDb,
   assertFound,
+  createAuditLog,
+  completeAuditLog,
+  failAuditLog,
+  getOrGenerateIdempotencyKey,
 } from "./_shared";
 import Stripe from "stripe";
 
@@ -179,7 +183,10 @@ export const purchaseRouter = router({
 
   // Purchase with points only (for adult content or by choice)
   purchaseWithPoints: protectedProcedure
-    .input(z.object({ postId: z.number() }))
+    .input(z.object({
+      postId: z.number(),
+      idempotencyKey: z.string().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       assertDb(db);
@@ -215,31 +222,65 @@ export const purchaseRouter = router({
         throw new TRPCError({ code: "CONFLICT", message: "Already purchased" });
       }
 
-      // Create purchase record
-      const [purchase] = await db.insert(purchases).values({
-        userId: ctx.user.id,
-        postId: input.postId,
-        amount: post.price,
-        paymentMethod: "points",
-        pointsUsed: post.price,
-        stripeAmount: 0,
-      }).returning();
-
-      // Deduct points
-      const newBalance = await deductPoints(
-        db,
+      // Generate idempotency key
+      const idemKey = getOrGenerateIdempotencyKey(
+        input.idempotencyKey,
+        "post_purchase_points",
         ctx.user.id,
-        post.price,
-        purchase.id,
-        `投稿購入: ${post.title || `Post #${post.id}`}`
+        input.postId
       );
 
-      // Update creator's total support
-      await db.update(creators)
-        .set({ totalSupport: sql`${creators.totalSupport} + ${post.price}` })
-        .where(eq(creators.id, post.creatorId));
+      // Create audit log
+      const auditLogId = await createAuditLog({
+        operationType: "post_purchase_points",
+        userId: ctx.user.id,
+        creatorId: post.creatorId,
+        totalAmount: post.price,
+        pointsAmount: post.price,
+        idempotencyKey: idemKey,
+      });
 
-      return { success: true, purchaseId: purchase.id, newBalance };
+      try {
+        // Create purchase record
+        const [purchase] = await db.insert(purchases).values({
+          userId: ctx.user.id,
+          postId: input.postId,
+          amount: post.price,
+          paymentMethod: "points",
+          pointsUsed: post.price,
+          stripeAmount: 0,
+          idempotencyKey: idemKey,
+        }).returning();
+
+        // Deduct points
+        const newBalance = await deductPoints(
+          db,
+          ctx.user.id,
+          post.price,
+          purchase.id,
+          `投稿購入: ${post.title || `Post #${post.id}`}`
+        );
+
+        // Update creator's total support
+        await db.update(creators)
+          .set({ totalSupport: sql`${creators.totalSupport} + ${post.price}` })
+          .where(eq(creators.id, post.creatorId));
+
+        // Complete audit log
+        await completeAuditLog(auditLogId, {
+          referenceType: "purchase",
+          referenceId: purchase.id,
+        });
+
+        return { success: true, purchaseId: purchase.id, newBalance };
+      } catch (error) {
+        // Log failure with recovery flag if points were deducted
+        await failAuditLog(auditLogId, {
+          code: error instanceof TRPCError ? error.code : "UNKNOWN",
+          message: error instanceof Error ? error.message : "Unknown error",
+        }, false);
+        throw error;
+      }
     }),
 
   // Create Stripe checkout for non-adult content direct purchase
@@ -248,6 +289,7 @@ export const purchaseRouter = router({
       postId: z.number(),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
+      idempotencyKey: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -293,37 +335,65 @@ export const purchaseRouter = router({
         throw new TRPCError({ code: "CONFLICT", message: "Already purchased" });
       }
 
-      const stripe = getStripe();
+      // Generate idempotency key
+      const idemKey = getOrGenerateIdempotencyKey(
+        input.idempotencyKey,
+        "post_purchase_stripe",
+        ctx.user.id,
+        input.postId
+      );
 
-      // Create checkout session
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: "jpy",
-              product_data: {
-                name: post.title || `Post #${post.id}`,
-                description: "コンテンツ購入",
-              },
-              unit_amount: post.price,
-            },
-            quantity: 1,
-          },
-        ],
-        metadata: {
-          userId: ctx.user.id.toString(),
-          postId: post.id.toString(),
-          creatorId: post.creatorId.toString(),
-          type: "post_purchase",
-          amount: post.price.toString(),
-        },
-        success_url: input.successUrl,
-        cancel_url: input.cancelUrl,
+      // Create audit log (pending state - will be completed by webhook)
+      const auditLogId = await createAuditLog({
+        operationType: "post_purchase_stripe",
+        userId: ctx.user.id,
+        creatorId: post.creatorId,
+        totalAmount: post.price,
+        stripeAmount: post.price,
+        idempotencyKey: idemKey,
       });
 
-      return { sessionId: session.id, url: session.url };
+      try {
+        const stripe = getStripe();
+
+        // Create checkout session
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "jpy",
+                product_data: {
+                  name: post.title || `Post #${post.id}`,
+                  description: "コンテンツ購入",
+                },
+                unit_amount: post.price,
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: {
+            userId: ctx.user.id.toString(),
+            postId: post.id.toString(),
+            creatorId: post.creatorId.toString(),
+            type: "post_purchase",
+            amount: post.price.toString(),
+            auditLogId: auditLogId.toString(),
+            idempotencyKey: idemKey,
+          },
+          success_url: input.successUrl,
+          cancel_url: input.cancelUrl,
+        });
+
+        return { sessionId: session.id, url: session.url };
+      } catch (error) {
+        await failAuditLog(auditLogId, {
+          code: "STRIPE_ERROR",
+          message: error instanceof Error ? error.message : "Stripe error",
+        }, false);
+        throw error;
+      }
     }),
 
   // Create hybrid payment (points + Stripe for remaining)
@@ -333,6 +403,7 @@ export const purchaseRouter = router({
       pointsToUse: z.number().min(0),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
+      idempotencyKey: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -390,67 +461,119 @@ export const purchaseRouter = router({
 
       const stripeAmount = post.price - input.pointsToUse;
 
+      // Generate idempotency key
+      const idemKey = getOrGenerateIdempotencyKey(
+        input.idempotencyKey,
+        stripeAmount === 0 ? "post_purchase_points" : "post_purchase_hybrid",
+        ctx.user.id,
+        input.postId
+      );
+
       // If all points cover the price, just do points purchase
       if (stripeAmount === 0) {
-        // Create purchase record
-        const [purchase] = await db.insert(purchases).values({
+        const auditLogId = await createAuditLog({
+          operationType: "post_purchase_points",
           userId: ctx.user.id,
-          postId: input.postId,
-          amount: post.price,
-          paymentMethod: "points",
-          pointsUsed: post.price,
-          stripeAmount: 0,
-        }).returning();
+          creatorId: post.creatorId,
+          totalAmount: post.price,
+          pointsAmount: post.price,
+          idempotencyKey: idemKey,
+        });
 
-        // Deduct points
-        const newBalance = await deductPoints(
-          db,
-          ctx.user.id,
-          post.price,
-          purchase.id,
-          `投稿購入: ${post.title || `Post #${post.id}`}`
-        );
+        try {
+          // Create purchase record
+          const [purchase] = await db.insert(purchases).values({
+            userId: ctx.user.id,
+            postId: input.postId,
+            amount: post.price,
+            paymentMethod: "points",
+            pointsUsed: post.price,
+            stripeAmount: 0,
+            idempotencyKey: idemKey,
+          }).returning();
 
-        // Update creator's total support
-        await db.update(creators)
-          .set({ totalSupport: sql`${creators.totalSupport} + ${post.price}` })
-          .where(eq(creators.id, post.creatorId));
+          // Deduct points
+          const newBalance = await deductPoints(
+            db,
+            ctx.user.id,
+            post.price,
+            purchase.id,
+            `投稿購入: ${post.title || `Post #${post.id}`}`
+          );
 
-        return { success: true, purchaseId: purchase.id, newBalance, requiresStripe: false };
+          // Update creator's total support
+          await db.update(creators)
+            .set({ totalSupport: sql`${creators.totalSupport} + ${post.price}` })
+            .where(eq(creators.id, post.creatorId));
+
+          await completeAuditLog(auditLogId, {
+            referenceType: "purchase",
+            referenceId: purchase.id,
+          });
+
+          return { success: true, purchaseId: purchase.id, newBalance, requiresStripe: false };
+        } catch (error) {
+          await failAuditLog(auditLogId, {
+            code: error instanceof TRPCError ? error.code : "UNKNOWN",
+            message: error instanceof Error ? error.message : "Unknown error",
+          }, false);
+          throw error;
+        }
       }
 
-      const stripe = getStripe();
-
-      // Create checkout session for remaining amount
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: "jpy",
-              product_data: {
-                name: post.title || `Post #${post.id}`,
-                description: `コンテンツ購入（${input.pointsToUse}pt割引適用）`,
-              },
-              unit_amount: stripeAmount,
-            },
-            quantity: 1,
-          },
-        ],
-        metadata: {
-          userId: ctx.user.id.toString(),
-          postId: post.id.toString(),
-          creatorId: post.creatorId.toString(),
-          type: "post_purchase_hybrid",
-          totalAmount: post.price.toString(),
-          pointsUsed: input.pointsToUse.toString(),
-          stripeAmount: stripeAmount.toString(),
-        },
-        success_url: input.successUrl,
-        cancel_url: input.cancelUrl,
+      // Create audit log for hybrid purchase
+      const auditLogId = await createAuditLog({
+        operationType: "post_purchase_hybrid",
+        userId: ctx.user.id,
+        creatorId: post.creatorId,
+        totalAmount: post.price,
+        pointsAmount: input.pointsToUse,
+        stripeAmount: stripeAmount,
+        idempotencyKey: idemKey,
       });
 
-      return { sessionId: session.id, url: session.url, requiresStripe: true };
+      try {
+        const stripe = getStripe();
+
+        // Create checkout session for remaining amount
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "jpy",
+                product_data: {
+                  name: post.title || `Post #${post.id}`,
+                  description: `コンテンツ購入（${input.pointsToUse}pt割引適用）`,
+                },
+                unit_amount: stripeAmount,
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: {
+            userId: ctx.user.id.toString(),
+            postId: post.id.toString(),
+            creatorId: post.creatorId.toString(),
+            type: "post_purchase_hybrid",
+            totalAmount: post.price.toString(),
+            pointsUsed: input.pointsToUse.toString(),
+            stripeAmount: stripeAmount.toString(),
+            auditLogId: auditLogId.toString(),
+            idempotencyKey: idemKey,
+          },
+          success_url: input.successUrl,
+          cancel_url: input.cancelUrl,
+        });
+
+        return { sessionId: session.id, url: session.url, requiresStripe: true };
+      } catch (error) {
+        await failAuditLog(auditLogId, {
+          code: "STRIPE_ERROR",
+          message: error instanceof Error ? error.message : "Stripe error",
+        }, false);
+        throw error;
+      }
     }),
 });

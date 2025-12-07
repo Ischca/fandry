@@ -1,9 +1,22 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { SignInButton } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Heart, Share2, User, Twitter, Instagram, Youtube, Globe, MoreHorizontal, Flag, Ban, Copy, Check, Link as LinkIcon, Users, Sparkles, Crown, Settings } from "lucide-react";
+import {
+  Heart,
+  Share2,
+  User,
+  MoreHorizontal,
+  Flag,
+  Ban,
+  Copy,
+  Check,
+  Link as LinkIcon,
+  Users,
+  Sparkles,
+  Crown,
+  Settings,
+} from "lucide-react";
 import { useParams, Link } from "wouter";
 import { TipDialog } from "@/components/TipDialog";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
@@ -17,17 +30,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { useState, useMemo } from "react";
-
-// Validate URL to only allow http/https protocols
-function isSafeUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+import { useState } from "react";
+import { PlanCard, SocialLinks } from "./creatorpage-components";
 
 export default function CreatorPage() {
   const { username } = useParams<{ username: string }>();
@@ -38,9 +42,10 @@ export default function CreatorPage() {
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const tipUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/tip/${username}`
-    : "";
+  const tipUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/tip/${username}`
+      : "";
 
   const handleCopyTipLink = async () => {
     try {
@@ -53,23 +58,24 @@ export default function CreatorPage() {
     }
   };
 
-  const { data: creator, isLoading: creatorLoading } = trpc.creator.getByUsername.useQuery(
-    { username: username || "" },
-    { enabled: !!username }
-  );
+  const { data: creator, isLoading: creatorLoading } =
+    trpc.creator.getByUsername.useQuery(
+      { username: username || "" },
+      { enabled: !!username }
+    );
 
-  // Get current user's creator profile to check if this is their own page
   const { data: myCreator } = trpc.creator.getMe.useQuery(undefined, {
     enabled: isAuthenticated,
   });
 
-  // Check if viewing own profile
-  const isOwnProfile = isAuthenticated && myCreator && creator && myCreator.id === creator.id;
+  const isOwnProfile =
+    isAuthenticated && myCreator && creator && myCreator.id === creator.id;
 
-  const { data: posts, isLoading: postsLoading } = trpc.post.getByCreatorUsername.useQuery(
-    { username: username || "", limit: 20 },
-    { enabled: !!username }
-  );
+  const { data: posts, isLoading: postsLoading } =
+    trpc.post.getByCreatorUsername.useQuery(
+      { username: username || "", limit: 20 },
+      { enabled: !!username }
+    );
 
   const { data: followData } = trpc.follow.check.useQuery(
     { creatorId: creator?.id || 0 },
@@ -82,23 +88,14 @@ export default function CreatorPage() {
   );
 
   const blockMutation = trpc.block.toggle.useMutation({
-    onSuccess: (result) => {
+    onSuccess: result => {
       utils.block.check.invalidate({ userId: creator?.userId || 0 });
-      if (result.blocked) {
-        toast.success("ブロックしました");
-      } else {
-        toast.success("ブロックを解除しました");
-      }
+      toast.success(
+        result.blocked ? "ブロックしました" : "ブロックを解除しました"
+      );
     },
-    onError: (error) => {
-      toast.error(`エラー: ${error.message}`);
-    },
+    onError: error => toast.error(`エラー: ${error.message}`),
   });
-
-  const handleBlockToggle = () => {
-    if (!creator) return;
-    blockMutation.mutate({ userId: creator.userId });
-  };
 
   const isBlocked = blockData?.blocked || false;
 
@@ -110,52 +107,61 @@ export default function CreatorPage() {
   const followMutation = trpc.follow.toggle.useMutation({
     onMutate: async () => {
       if (!creator) return;
-      // Cancel any outgoing refetches
       await utils.follow.check.cancel({ creatorId: creator.id });
       await utils.creator.getByUsername.cancel({ username: username || "" });
 
-      // Snapshot the previous values
-      const previousFollowData = utils.follow.check.getData({ creatorId: creator.id });
-      const previousCreatorData = utils.creator.getByUsername.getData({ username: username || "" });
+      const previousFollowData = utils.follow.check.getData({
+        creatorId: creator.id,
+      });
+      const previousCreatorData = utils.creator.getByUsername.getData({
+        username: username || "",
+      });
 
-      // Optimistically update
       if (previousFollowData) {
-        utils.follow.check.setData({ creatorId: creator.id }, { following: !previousFollowData.following });
+        utils.follow.check.setData(
+          { creatorId: creator.id },
+          { following: !previousFollowData.following }
+        );
       }
       if (previousCreatorData) {
-        utils.creator.getByUsername.setData({ username: username || "" }, {
-          ...previousCreatorData,
-          followerCount: previousCreatorData.followerCount + (previousFollowData?.following ? -1 : 1),
-        });
+        utils.creator.getByUsername.setData(
+          { username: username || "" },
+          {
+            ...previousCreatorData,
+            followerCount:
+              previousCreatorData.followerCount +
+              (previousFollowData?.following ? -1 : 1),
+          }
+        );
       }
 
       return { previousFollowData, previousCreatorData };
     },
     onError: (_err, _variables, context) => {
       if (!creator) return;
-      // Rollback on error
       if (context?.previousFollowData) {
-        utils.follow.check.setData({ creatorId: creator.id }, context.previousFollowData);
+        utils.follow.check.setData(
+          { creatorId: creator.id },
+          context.previousFollowData
+        );
       }
       if (context?.previousCreatorData) {
-        utils.creator.getByUsername.setData({ username: username || "" }, context.previousCreatorData);
+        utils.creator.getByUsername.setData(
+          { username: username || "" },
+          context.previousCreatorData
+        );
       }
       toast.error("エラーが発生しました");
     },
-    onSuccess: (data) => {
-      toast.success(data.following ? "フォローしました" : "フォローを解除しました");
-    },
+    onSuccess: data =>
+      toast.success(
+        data.following ? "フォローしました" : "フォローを解除しました"
+      ),
     onSettled: () => {
-      // Refetch to ensure consistency
       utils.follow.check.invalidate({ creatorId: creator?.id || 0 });
       utils.creator.getByUsername.invalidate({ username: username || "" });
     },
   });
-
-  const handleFollowToggle = () => {
-    if (!creator) return;
-    followMutation.mutate({ creatorId: creator.id });
-  };
 
   const isFollowing = followData?.following || false;
 
@@ -181,7 +187,9 @@ export default function CreatorPage() {
           <p className="text-muted-foreground">URLを確認してください</p>
         </div>
         <Link href="/discover">
-          <Button size="lg" className="shine-effect">クリエイターを探す</Button>
+          <Button size="lg" className="shine-effect">
+            クリエイターを探す
+          </Button>
         </Link>
       </div>
     );
@@ -202,7 +210,6 @@ export default function CreatorPage() {
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-[oklch(0.85_0.16_85)]/20" />
         )}
-        {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
       </div>
 
@@ -230,8 +237,12 @@ export default function CreatorPage() {
           <div className="flex-1 pt-4 md:pt-20 space-y-4">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div className="space-y-2">
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{creator.displayName}</h1>
-                <p className="text-muted-foreground text-lg">@{creator.username}</p>
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                  {creator.displayName}
+                </h1>
+                <p className="text-muted-foreground text-lg">
+                  @{creator.username}
+                </p>
               </div>
 
               {/* Actions */}
@@ -264,7 +275,6 @@ export default function CreatorPage() {
                 </DropdownMenu>
 
                 {isOwnProfile ? (
-                  /* Own profile - show edit button */
                   <Link href="/settings/profile">
                     <Button className="gap-2 font-semibold">
                       <Settings className="h-4 w-4" />
@@ -272,11 +282,12 @@ export default function CreatorPage() {
                     </Button>
                   </Link>
                 ) : isAuthenticated ? (
-                  /* Other creator's profile - show follow/tip/report buttons */
                   <>
                     <Button
                       variant={isFollowing ? "secondary" : "outline"}
-                      onClick={handleFollowToggle}
+                      onClick={() =>
+                        followMutation.mutate({ creatorId: creator.id })
+                      }
                       disabled={followMutation.isPending}
                       className="border-2 font-semibold"
                     >
@@ -291,13 +302,19 @@ export default function CreatorPage() {
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon" className="border-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="border-2"
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={handleBlockToggle}
+                          onClick={() =>
+                            blockMutation.mutate({ userId: creator.userId })
+                          }
                           disabled={blockMutation.isPending}
                         >
                           <Ban className="h-4 w-4 mr-2" />
@@ -326,20 +343,26 @@ export default function CreatorPage() {
 
             {/* Bio */}
             {creator.bio && (
-              <p className="text-foreground leading-relaxed max-w-2xl">{creator.bio}</p>
+              <p className="text-foreground leading-relaxed max-w-2xl">
+                {creator.bio}
+              </p>
             )}
 
             {/* Stats & Category */}
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Users className="h-4 w-4" />
-                <span className="font-semibold text-foreground">{creator.followerCount.toLocaleString()}</span>
+                <span className="font-semibold text-foreground">
+                  {creator.followerCount.toLocaleString()}
+                </span>
                 <span>フォロワー</span>
               </div>
               {creator.totalSupport > 0 && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="font-semibold text-foreground">¥{creator.totalSupport.toLocaleString()}</span>
+                  <span className="font-semibold text-foreground">
+                    ¥{creator.totalSupport.toLocaleString()}
+                  </span>
                   <span>総支援額</span>
                 </div>
               )}
@@ -351,58 +374,7 @@ export default function CreatorPage() {
             </div>
 
             {/* Social Links */}
-            {creator.socialLinks && (() => {
-              try {
-                const links = JSON.parse(creator.socialLinks);
-                if (Object.keys(links).length === 0) return null;
-                return (
-                  <div className="flex items-center gap-2">
-                    {links.twitter && isSafeUrl(links.twitter) && (
-                      <a
-                        href={links.twitter}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                      >
-                        <Twitter className="h-5 w-5" />
-                      </a>
-                    )}
-                    {links.instagram && isSafeUrl(links.instagram) && (
-                      <a
-                        href={links.instagram}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                      >
-                        <Instagram className="h-5 w-5" />
-                      </a>
-                    )}
-                    {links.youtube && isSafeUrl(links.youtube) && (
-                      <a
-                        href={links.youtube}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                      >
-                        <Youtube className="h-5 w-5" />
-                      </a>
-                    )}
-                    {links.website && isSafeUrl(links.website) && (
-                      <a
-                        href={links.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                      >
-                        <Globe className="h-5 w-5" />
-                      </a>
-                    )}
-                  </div>
-                );
-              } catch {
-                return null;
-              }
-            })()}
+            <SocialLinks socialLinksJson={creator.socialLinks} />
           </div>
         </div>
       </div>
@@ -419,55 +391,13 @@ export default function CreatorPage() {
               <h2 className="text-2xl font-bold">月額支援プラン</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              {plans.map((plan) => {
-                let benefits: string[] = [];
-                try {
-                  benefits = plan.benefits ? JSON.parse(plan.benefits) : [];
-                } catch {
-                  benefits = [];
-                }
-                return (
-                  <Card
-                    key={plan.id}
-                    className="p-6 space-y-4 card-interactive cursor-pointer"
-                    onClick={() => setSubscribeDialogOpen(true)}
-                  >
-                    <div className="flex items-baseline justify-between">
-                      <h3 className="font-bold text-lg">{plan.name}</h3>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-primary">¥{plan.price.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">/月</p>
-                      </div>
-                    </div>
-                    {plan.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">{plan.description}</p>
-                    )}
-                    {benefits.length > 0 && (
-                      <ul className="space-y-2 text-sm">
-                        {benefits.slice(0, 3).map((benefit, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                            <span className="line-clamp-1">{benefit}</span>
-                          </li>
-                        ))}
-                        {benefits.length > 3 && (
-                          <li className="text-muted-foreground pl-6">
-                            +{benefits.length - 3}件の特典
-                          </li>
-                        )}
-                      </ul>
-                    )}
-                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground">
-                        {plan.subscriberCount}人が加入中
-                      </p>
-                      <Button size="sm" className="font-semibold">
-                        加入する
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
+              {plans.map(plan => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  onSubscribe={() => setSubscribeDialogOpen(true)}
+                />
+              ))}
             </div>
           </section>
         )}
@@ -486,7 +416,7 @@ export default function CreatorPage() {
             </div>
           ) : posts && posts.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {posts.map((post) => (
+              {posts.map(post => (
                 <PostCard
                   key={post.id}
                   post={{
@@ -511,7 +441,7 @@ export default function CreatorPage() {
         </section>
       </div>
 
-      {/* Dialogs - only for other creators, not own profile */}
+      {/* Dialogs */}
       {isAuthenticated && !isOwnProfile && (
         <>
           <TipDialog

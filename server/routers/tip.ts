@@ -5,7 +5,6 @@ import {
   TRPCError,
   z,
   eq,
-  and,
   sql,
   getDb,
   creators,

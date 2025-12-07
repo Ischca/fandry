@@ -108,7 +108,7 @@ export const creatorRouter = router({
       assertFound(creator?.[0], ErrorMessages.CREATOR_NOT_FOUND);
 
       // Validate and sanitize social links if provided
-      let sanitizedInput = { ...input };
+      const sanitizedInput = { ...input };
       if (input.socialLinks) {
         try {
           sanitizedInput.socialLinks = validateSocialLinks(input.socialLinks);

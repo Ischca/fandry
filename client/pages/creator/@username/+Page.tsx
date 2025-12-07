@@ -1,321 +1,49 @@
 import { useData } from "vike-react/useData";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { SignInButton } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { trpc } from "@/lib/trpc";
 import {
-  Heart,
-  Share2,
   User,
   Twitter,
   Instagram,
   Youtube,
   Globe,
-  MoreHorizontal,
-  Flag,
-  Ban,
-  Copy,
-  Check,
-  Link as LinkIcon,
   Users,
   Sparkles,
   Crown,
-  Settings,
+  Star,
+  Zap,
 } from "lucide-react";
 import { Link } from "wouter";
-import { TipDialog } from "@/components/TipDialog";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
-import { PostCard } from "@/components/PostCard";
-import { ReportDialog } from "@/components/ReportDialog";
 import { Header } from "@/components/Header";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { CreatorPageData } from "./+data";
-
-// Validate URL to only allow http/https protocols
-function isSafeUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-// Client-only auth actions component
-function AuthActions({
-  creator,
-  plans,
-}: {
-  creator: NonNullable<CreatorPageData["creator"]>;
-  plans: CreatorPageData["plans"];
-}) {
-  const { isAuthenticated } = useAuth();
-  const utils = trpc.useUtils();
-  const [tipDialogOpen, setTipDialogOpen] = useState(false);
-  const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
-  const [reportDialogOpen, setReportDialogOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const tipUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/tip/${creator.username}`
-      : "";
-
-  const handleCopyTipLink = async () => {
-    try {
-      await navigator.clipboard.writeText(tipUrl);
-      setCopied(true);
-      toast.success("チップリンクをコピーしました");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("コピーに失敗しました");
-    }
-  };
-
-  // Get current user's creator profile to check if this is their own page
-  const { data: myCreator } = trpc.creator.getMe.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
-
-  // Check if viewing own profile
-  const isOwnProfile =
-    isAuthenticated && myCreator && myCreator.id === creator.id;
-
-  const { data: followData } = trpc.follow.check.useQuery(
-    { creatorId: creator.id },
-    { enabled: isAuthenticated }
-  );
-
-  const { data: blockData } = trpc.block.check.useQuery(
-    { userId: creator.userId },
-    { enabled: isAuthenticated }
-  );
-
-  const blockMutation = trpc.block.toggle.useMutation({
-    onSuccess: (result) => {
-      utils.block.check.invalidate({ userId: creator.userId });
-      if (result.blocked) {
-        toast.success("ブロックしました");
-      } else {
-        toast.success("ブロックを解除しました");
-      }
-    },
-    onError: (error) => {
-      toast.error(`エラー: ${error.message}`);
-    },
-  });
-
-  const handleBlockToggle = () => {
-    blockMutation.mutate({ userId: creator.userId });
-  };
-
-  const isBlocked = blockData?.blocked || false;
-
-  const followMutation = trpc.follow.toggle.useMutation({
-    onMutate: async () => {
-      await utils.follow.check.cancel({ creatorId: creator.id });
-      const previousFollowData = utils.follow.check.getData({
-        creatorId: creator.id,
-      });
-      if (previousFollowData) {
-        utils.follow.check.setData(
-          { creatorId: creator.id },
-          { following: !previousFollowData.following }
-        );
-      }
-      return { previousFollowData };
-    },
-    onError: (_err, _variables, context) => {
-      if (context?.previousFollowData) {
-        utils.follow.check.setData(
-          { creatorId: creator.id },
-          context.previousFollowData
-        );
-      }
-      toast.error("エラーが発生しました");
-    },
-    onSuccess: (data) => {
-      toast.success(data.following ? "フォローしました" : "フォローを解除しました");
-    },
-    onSettled: () => {
-      utils.follow.check.invalidate({ creatorId: creator.id });
-    },
-  });
-
-  const handleFollowToggle = () => {
-    followMutation.mutate({ creatorId: creator.id });
-  };
-
-  const isFollowing = followData?.following || false;
-
-  return (
-    <>
-      <div className="flex flex-wrap gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="border-2">
-              <Share2 className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={handleCopyTipLink}>
-              {copied ? (
-                <Check className="h-4 w-4 mr-2 text-green-500" />
-              ) : (
-                <LinkIcon className="h-4 w-4 mr-2" />
-              )}
-              チップリンクをコピー
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                toast.success("ページリンクをコピーしました");
-              }}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              ページリンクをコピー
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {isOwnProfile ? (
-          <Link href="/settings/profile">
-            <Button className="gap-2 font-semibold">
-              <Settings className="h-4 w-4" />
-              プロフィール編集
-            </Button>
-          </Link>
-        ) : isAuthenticated ? (
-          <>
-            <Button
-              variant={isFollowing ? "secondary" : "outline"}
-              onClick={handleFollowToggle}
-              disabled={followMutation.isPending}
-              className="border-2 font-semibold"
-            >
-              {isFollowing ? "フォロー中" : "フォロー"}
-            </Button>
-            <Button
-              onClick={() => setTipDialogOpen(true)}
-              className="shine-effect gap-2 font-semibold"
-            >
-              <Heart className="h-4 w-4" />
-              応援する
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="border-2">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={handleBlockToggle}
-                  disabled={blockMutation.isPending}
-                >
-                  <Ban className="h-4 w-4 mr-2" />
-                  {isBlocked ? "ブロック解除" : "ブロック"}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setReportDialogOpen(true)}
-                  className="text-destructive"
-                >
-                  <Flag className="h-4 w-4 mr-2" />
-                  通報する
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        ) : (
-          <SignInButton mode="modal">
-            <Button className="shine-effect gap-2 font-semibold">
-              <Heart className="h-4 w-4" />
-              応援する
-            </Button>
-          </SignInButton>
-        )}
-      </div>
-
-      {/* Dialogs - only for other creators, not own profile */}
-      {isAuthenticated && !isOwnProfile && (
-        <>
-          <TipDialog
-            open={tipDialogOpen}
-            onOpenChange={setTipDialogOpen}
-            creatorId={creator.id}
-            creatorName={creator.displayName}
-          />
-          {plans && plans.length > 0 && (
-            <SubscribeDialog
-              open={subscribeDialogOpen}
-              onOpenChange={setSubscribeDialogOpen}
-              plans={plans}
-              creatorId={creator.id}
-              creatorName={creator.displayName}
-            />
-          )}
-          <ReportDialog
-            open={reportDialogOpen}
-            onOpenChange={setReportDialogOpen}
-            targetType="creator"
-            targetId={creator.id}
-            targetName={creator.username}
-          />
-        </>
-      )}
-    </>
-  );
-}
-
-// Client-only wrapper to prevent SSR of auth components
-function ClientOnlyAuthActions(props: Parameters<typeof AuthActions>[0]) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    // SSR placeholder - show share button only
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="icon" className="border-2">
-          <Share2 className="h-4 w-4" />
-        </Button>
-        <Button className="shine-effect gap-2 font-semibold">
-          <Heart className="h-4 w-4" />
-          応援する
-        </Button>
-      </div>
-    );
-  }
-
-  return <AuthActions {...props} />;
-}
+import {
+  ShareDialog,
+  PostPreviewCard,
+  PlanCard,
+  ClientOnlyAuthActions,
+  isSafeUrl,
+} from "./components";
 
 export default function CreatorPage() {
   const { creator, posts, plans } = useData<CreatorPageData>();
+  const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
 
   if (!creator) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 hero-gradient">
-        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
-          <User className="h-12 w-12 text-muted-foreground" />
+      <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-background to-muted/30">
+        <div className="w-28 h-28 rounded-3xl bg-muted/50 flex items-center justify-center">
+          <User className="h-14 w-14 text-muted-foreground/40" />
         </div>
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">クリエイターが見つかりません</h1>
+        <div className="text-center space-y-3">
+          <h1 className="text-3xl font-bold tracking-tight">
+            クリエイターが見つかりません
+          </h1>
           <p className="text-muted-foreground">URLを確認してください</p>
         </div>
         <Link href="/discover">
-          <Button size="lg" className="shine-effect">
+          <Button size="lg" className="gap-2">
+            <Sparkles className="h-4 w-4" />
             クリエイターを探す
           </Button>
         </Link>
@@ -323,250 +51,275 @@ export default function CreatorPage() {
     );
   }
 
+  // Parse social links
+  let socialLinks: Record<string, string> = {};
+  try {
+    socialLinks = creator.socialLinks ? JSON.parse(creator.socialLinks) : {};
+  } catch {
+    socialLinks = {};
+  }
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-24">
       <Header />
 
-      {/* Cover Image / Gradient */}
-      <div className="relative w-full h-56 md:h-72 overflow-hidden">
-        {creator.coverUrl ? (
-          <img
-            src={creator.coverUrl}
-            alt="Cover"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-[oklch(0.85_0.16_85)]/20" />
-        )}
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-      </div>
-
-      {/* Profile Section */}
-      <div className="container relative">
-        <div className="flex flex-col md:flex-row gap-6 -mt-20 md:-mt-24">
-          {/* Avatar */}
-          <div className="relative z-10">
-            <div className="w-36 h-36 md:w-44 md:h-44 rounded-2xl border-4 border-background bg-card shadow-xl overflow-hidden">
-              {creator.avatarUrl ? (
-                <img
-                  src={creator.avatarUrl}
-                  alt={creator.displayName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                  <User className="h-16 w-16 text-primary" />
-                </div>
-              )}
+      {/* Hero Section */}
+      <section className="relative">
+        {/* Cover Image */}
+        <div className="relative w-full h-[50vh] min-h-[400px] max-h-[600px] overflow-hidden">
+          {creator.coverUrl ? (
+            <img
+              src={creator.coverUrl}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-[oklch(0.85_0.16_85)]/20">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(224,90,58,0.15),transparent_50%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_60%,rgba(200,150,50,0.1),transparent_50%)]" />
             </div>
-          </div>
+          )}
 
-          {/* Profile Info */}
-          <div className="flex-1 pt-4 md:pt-20 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent" />
+
+          <div className="absolute top-6 right-6">
+            <ShareDialog
+              username={creator.username}
+              displayName={creator.displayName}
+            />
+          </div>
+        </div>
+
+        {/* Profile Info Overlay */}
+        <div className="container relative -mt-32 z-10">
+          <div className="flex flex-col md:flex-row gap-8 items-start">
+            {/* Avatar */}
+            <div className="relative">
+              <div className="w-40 h-40 md:w-48 md:h-48 rounded-3xl border-4 border-background bg-card shadow-2xl overflow-hidden">
+                {creator.avatarUrl ? (
+                  <img
+                    src={creator.avatarUrl}
+                    alt={creator.displayName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                    <User className="h-20 w-20 text-primary" />
+                  </div>
+                )}
+              </div>
+              <div className="absolute -bottom-2 -right-2 w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+                <Star className="h-6 w-6 text-white fill-white" />
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 pt-4 md:pt-8 space-y-4">
               <div className="space-y-2">
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-                  {creator.displayName}
-                </h1>
-                <p className="text-muted-foreground text-lg">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
+                    {creator.displayName}
+                  </h1>
+                  {creator.category && (
+                    <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                      {creator.category}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xl text-muted-foreground">
                   @{creator.username}
                 </p>
               </div>
 
-              {/* Actions - Client only */}
-              <ClientOnlyAuthActions creator={creator} plans={plans} />
-            </div>
+              {creator.bio && (
+                <p className="text-lg text-foreground/80 leading-relaxed max-w-2xl">
+                  {creator.bio}
+                </p>
+              )}
 
-            {/* Bio */}
-            {creator.bio && (
-              <p className="text-foreground leading-relaxed max-w-2xl">
-                {creator.bio}
-              </p>
-            )}
+              {/* Stats */}
+              <div className="flex flex-wrap items-center gap-6 pt-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">
+                      {creator.followerCount.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">フォロワー</p>
+                  </div>
+                </div>
 
-            {/* Stats & Category */}
-            <div className="flex flex-wrap items-center gap-4 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Users className="h-4 w-4" />
-                <span className="font-semibold text-foreground">
-                  {creator.followerCount.toLocaleString()}
-                </span>
-                <span>フォロワー</span>
+                {creator.totalSupport > 0 && (
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-[oklch(0.85_0.16_85)]/20 flex items-center justify-center">
+                      <Zap className="h-5 w-5 text-[oklch(0.7_0.14_85)]" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">
+                        ¥{creator.totalSupport.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">累計支援</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                    <Sparkles className="h-5 w-5 text-violet-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{posts?.length || 0}</p>
+                    <p className="text-xs text-muted-foreground">投稿</p>
+                  </div>
+                </div>
               </div>
-              {creator.totalSupport > 0 && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="font-semibold text-foreground">
-                    ¥{creator.totalSupport.toLocaleString()}
-                  </span>
-                  <span>総支援額</span>
+
+              {/* Social Links */}
+              {Object.keys(socialLinks).length > 0 && (
+                <div className="flex items-center gap-2 pt-2">
+                  {socialLinks.twitter && isSafeUrl(socialLinks.twitter) && (
+                    <a
+                      href={socialLinks.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-11 h-11 rounded-xl bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                    >
+                      <Twitter className="h-5 w-5" />
+                    </a>
+                  )}
+                  {socialLinks.instagram && isSafeUrl(socialLinks.instagram) && (
+                    <a
+                      href={socialLinks.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-11 h-11 rounded-xl bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                    >
+                      <Instagram className="h-5 w-5" />
+                    </a>
+                  )}
+                  {socialLinks.youtube && isSafeUrl(socialLinks.youtube) && (
+                    <a
+                      href={socialLinks.youtube}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-11 h-11 rounded-xl bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                    >
+                      <Youtube className="h-5 w-5" />
+                    </a>
+                  )}
+                  {socialLinks.website && isSafeUrl(socialLinks.website) && (
+                    <a
+                      href={socialLinks.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-11 h-11 rounded-xl bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                    >
+                      <Globe className="h-5 w-5" />
+                    </a>
+                  )}
                 </div>
               )}
-              {creator.category && (
-                <span className="px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-sm font-medium">
-                  {creator.category}
-                </span>
-              )}
             </div>
-
-            {/* Social Links */}
-            {creator.socialLinks &&
-              (() => {
-                try {
-                  const links = JSON.parse(creator.socialLinks);
-                  if (Object.keys(links).length === 0) return null;
-                  return (
-                    <div className="flex items-center gap-2">
-                      {links.twitter && isSafeUrl(links.twitter) && (
-                        <a
-                          href={links.twitter}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                        >
-                          <Twitter className="h-5 w-5" />
-                        </a>
-                      )}
-                      {links.instagram && isSafeUrl(links.instagram) && (
-                        <a
-                          href={links.instagram}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                        >
-                          <Instagram className="h-5 w-5" />
-                        </a>
-                      )}
-                      {links.youtube && isSafeUrl(links.youtube) && (
-                        <a
-                          href={links.youtube}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                        >
-                          <Youtube className="h-5 w-5" />
-                        </a>
-                      )}
-                      {links.website && isSafeUrl(links.website) && (
-                        <a
-                          href={links.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                        >
-                          <Globe className="h-5 w-5" />
-                        </a>
-                      )}
-                    </div>
-                  );
-                } catch {
-                  return null;
-                }
-              })()}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Content */}
-      <div className="container py-12 space-y-12">
+      <div className="container py-16 space-y-20">
         {/* Subscription Plans */}
         {plans && plans.length > 0 && (
-          <section className="space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-[oklch(0.85_0.16_85)]/10">
-                <Crown className="h-5 w-5 text-[oklch(0.75_0.14_85)]" />
+          <section>
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[oklch(0.85_0.16_85)] to-[oklch(0.7_0.14_85)] flex items-center justify-center shadow-lg shadow-[oklch(0.85_0.16_85)]/30">
+                <Crown className="h-6 w-6 text-white" />
               </div>
-              <h2 className="text-2xl font-bold">月額支援プラン</h2>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  月額サポートプラン
+                </h2>
+                <p className="text-muted-foreground">
+                  メンバー限定のコンテンツや特典を楽しもう
+                </p>
+              </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {plans.map((plan) => {
-                let benefits: string[] = [];
-                try {
-                  benefits = plan.benefits ? JSON.parse(plan.benefits) : [];
-                } catch {
-                  benefits = [];
-                }
-                return (
-                  <Card key={plan.id} className="p-6 space-y-4 card-interactive">
-                    <div className="flex items-baseline justify-between">
-                      <h3 className="font-bold text-lg">{plan.name}</h3>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-primary">
-                          ¥{plan.price.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-muted-foreground">/月</p>
-                      </div>
-                    </div>
-                    {plan.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {plan.description}
-                      </p>
-                    )}
-                    {benefits.length > 0 && (
-                      <ul className="space-y-2 text-sm">
-                        {benefits.slice(0, 3).map((benefit, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                            <span className="line-clamp-1">{benefit}</span>
-                          </li>
-                        ))}
-                        {benefits.length > 3 && (
-                          <li className="text-muted-foreground pl-6">
-                            +{benefits.length - 3}件の特典
-                          </li>
-                        )}
-                      </ul>
-                    )}
-                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground">
-                        {plan.subscriberCount}人が加入中
-                      </p>
-                      <Button size="sm" className="font-semibold">
-                        加入する
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
+
+            <div
+              className={`grid gap-6 ${plans.length === 1 ? "max-w-md" : plans.length === 2 ? "md:grid-cols-2 max-w-2xl" : "md:grid-cols-3"}`}
+            >
+              {plans.map((plan, index) => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  featured={
+                    plans.length > 1 && index === Math.floor(plans.length / 2)
+                  }
+                  onSubscribe={() => setSubscribeDialogOpen(true)}
+                />
+              ))}
             </div>
           </section>
         )}
 
         {/* Posts */}
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Sparkles className="h-5 w-5 text-primary" />
+        <section>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-[oklch(0.55_0.18_35)] flex items-center justify-center shadow-lg shadow-primary/30">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">投稿</h2>
+                <p className="text-muted-foreground">
+                  最新のコンテンツをチェック
+                </p>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold">投稿</h2>
           </div>
+
           {posts && posts.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {posts.map((post) => (
-                <PostCard
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {posts.map(post => (
+                <PostPreviewCard
                   key={post.id}
-                  post={{
-                    ...post,
-                    creator: {
-                      id: creator.id,
-                      username: creator.username,
-                      displayName: creator.displayName,
-                      avatarUrl: creator.avatarUrl,
-                    },
+                  post={post}
+                  creator={{
+                    username: creator.username,
+                    displayName: creator.displayName,
+                    avatarUrl: creator.avatarUrl,
                   }}
                 />
               ))}
             </div>
           ) : (
-            <div className="text-center py-16 text-muted-foreground">
-              <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-30" />
-              <p className="text-lg font-medium">まだ投稿がありません</p>
-              <p className="text-sm mt-1">最初の投稿を楽しみにお待ちください</p>
+            <div className="text-center py-20">
+              <div className="w-20 h-20 rounded-3xl bg-muted/50 flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="h-10 w-10 text-muted-foreground/30" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">
+                まだ投稿がありません
+              </h3>
+              <p className="text-muted-foreground">
+                最初の投稿を楽しみにお待ちください
+              </p>
             </div>
           )}
         </section>
       </div>
+
+      <ClientOnlyAuthActions creator={creator} plans={plans} />
+
+      {plans && plans.length > 0 && (
+        <SubscribeDialog
+          open={subscribeDialogOpen}
+          onOpenChange={setSubscribeDialogOpen}
+          plans={plans}
+          creatorId={creator.id}
+          creatorName={creator.displayName}
+        />
+      )}
     </div>
   );
 }

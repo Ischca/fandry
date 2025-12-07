@@ -8,7 +8,7 @@ import { Loader2, Heart } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Feed() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const { data: posts, isLoading } = trpc.feed.getFollowingPosts.useQuery(
     undefined,
     { enabled: isAuthenticated }

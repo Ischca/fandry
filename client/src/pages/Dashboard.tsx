@@ -5,9 +5,7 @@ import { trpc } from "@/lib/trpc";
 import {
   Heart,
   TrendingUp,
-  Users,
   DollarSign,
-  ArrowUpRight,
   Gift,
   Crown,
   Calendar,

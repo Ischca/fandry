@@ -1,0 +1,63 @@
+import { Card, CardContent } from "@/components/ui/card";
+
+export function ColorCombinationsSection() {
+  return (
+    <section className="space-y-4">
+      <h3 className="text-2xl font-semibold">Color Combinations</h3>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-primary text-primary-foreground rounded-lg p-4">
+              <p className="font-medium mb-1">Primary</p>
+              <p className="text-sm opacity-90">
+                Primary background with foreground text
+              </p>
+            </div>
+            <div className="bg-secondary text-secondary-foreground rounded-lg p-4">
+              <p className="font-medium mb-1">Secondary</p>
+              <p className="text-sm opacity-90">
+                Secondary background with foreground text
+              </p>
+            </div>
+            <div className="bg-muted text-muted-foreground rounded-lg p-4">
+              <p className="font-medium mb-1">Muted</p>
+              <p className="text-sm opacity-90">
+                Muted background with foreground text
+              </p>
+            </div>
+            <div className="bg-accent text-accent-foreground rounded-lg p-4">
+              <p className="font-medium mb-1">Accent</p>
+              <p className="text-sm opacity-90">
+                Accent background with foreground text
+              </p>
+            </div>
+            <div className="bg-destructive text-destructive-foreground rounded-lg p-4">
+              <p className="font-medium mb-1">Destructive</p>
+              <p className="text-sm opacity-90">
+                Destructive background with foreground text
+              </p>
+            </div>
+            <div className="bg-card text-card-foreground rounded-lg p-4 border">
+              <p className="font-medium mb-1">Card</p>
+              <p className="text-sm opacity-90">
+                Card background with foreground text
+              </p>
+            </div>
+            <div className="bg-popover text-popover-foreground rounded-lg p-4 border">
+              <p className="font-medium mb-1">Popover</p>
+              <p className="text-sm opacity-90">
+                Popover background with foreground text
+              </p>
+            </div>
+            <div className="bg-background text-foreground rounded-lg p-4 border">
+              <p className="font-medium mb-1">Background</p>
+              <p className="text-sm opacity-90">
+                Default background with foreground text
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}

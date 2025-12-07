@@ -1,4 +1,4 @@
-import { Heart, Users, UserPlus, UserMinus } from "lucide-react";
+import { Users, UserPlus, UserMinus } from "lucide-react";
 import { Link } from "wouter";
 import { useClerk } from "@clerk/clerk-react";
 import { Card, CardContent } from "@/components/ui/card";

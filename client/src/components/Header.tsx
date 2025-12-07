@@ -3,6 +3,7 @@ import { SignInButton } from "@clerk/clerk-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { PointBalance } from "@/components/PointBalance";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   Heart,
   PenSquare,
@@ -10,7 +11,6 @@ import {
   Trophy,
   Home,
   Compass,
-  Bell,
   Menu,
   X,
 } from "lucide-react";
@@ -25,8 +25,9 @@ interface HeaderProps {
 
 export function Header({ minimal = false }: HeaderProps) {
   const { isAuthenticated, user } = useAuth();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Get creator profile for avatar
   const { data: creatorProfile } = trpc.creator.getMe.useQuery(undefined, {
@@ -77,18 +78,29 @@ export function Header({ minimal = false }: HeaderProps) {
           </nav>
         )}
 
-        {/* Search (placeholder for future) */}
+        {/* Search */}
         {!minimal && (
-          <div className="hidden lg:flex flex-1 max-w-md mx-4">
+          <form
+            className="hidden lg:flex flex-1 max-w-md mx-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (searchQuery.trim()) {
+                navigate(`/discover?q=${encodeURIComponent(searchQuery.trim())}`);
+                setSearchQuery("");
+              }
+            }}
+          >
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="クリエイターを検索..."
                 className="w-full h-9 pl-9 pr-4 rounded-full border border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
               />
             </div>
-          </div>
+          </form>
         )}
 
         {/* Right side actions */}
@@ -108,23 +120,13 @@ export function Header({ minimal = false }: HeaderProps) {
                 </Link>
               )}
 
-              {/* Notifications (placeholder) */}
-              {!minimal && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative hidden sm:inline-flex"
-                >
-                  <Bell className="h-5 w-5" />
-                  {/* Notification badge */}
-                  {/* <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" /> */}
-                </Button>
-              )}
-
               {/* Point Balance */}
               <div className="hidden sm:block">
                 <PointBalance />
               </div>
+
+              {/* Notification Bell */}
+              <NotificationBell />
 
               {/* User Avatar */}
               <Link href="/my">

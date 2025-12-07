@@ -2,7 +2,7 @@
 export { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 export { TRPCError } from "@trpc/server";
 export { z } from "zod";
-export { eq, sql, and } from "drizzle-orm";
+export { eq, sql, and, gte } from "drizzle-orm";
 export { getDb } from "../db";
 export {
   creators,
@@ -17,6 +17,10 @@ export {
   userPoints,
   pointTransactions,
   pointPackages,
+  creatorBalances,
+  withdrawals,
+  bankAccounts,
+  notifications,
 } from "../../drizzle/schema";
 
 // Unified error handling

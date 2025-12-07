@@ -18,6 +18,9 @@ import {
   pointRouter,
   purchaseRouter,
   subscriptionRouter,
+  withdrawalRouter,
+  receiptRouter,
+  notificationRouter,
 } from "./routers/index";
 
 export const appRouter = router({
@@ -43,6 +46,9 @@ export const appRouter = router({
   point: pointRouter,
   purchase: purchaseRouter,
   subscription: subscriptionRouter,
+  withdrawal: withdrawalRouter,
+  receipt: receiptRouter,
+  notification: notificationRouter,
 });
 
 export type AppRouter = typeof appRouter;

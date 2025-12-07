@@ -157,14 +157,14 @@ pnpm vitest run server/creator.test.ts
 - `VITE_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key for frontend
 
 **Optional**:
-- S3/R2 storage: `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`
+- Cloudflare R2: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`
 
 ## Deployment
 
 - **Hosting**: Railway
 - **Database**: Neon PostgreSQL
 - **Storage**: Cloudflare R2
-- **Domain**: fndry.app (via Cloudflare DNS)
+- **Domain**: fandry.app (via Cloudflare DNS)
 
 ## Document Maintenance
 

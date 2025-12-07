@@ -337,3 +337,116 @@ export const pointPackages = pgTable("point_packages", {
 
 export type PointPackage = typeof pointPackages.$inferSelect;
 export type InsertPointPackage = typeof pointPackages.$inferInsert;
+
+/**
+ * Withdrawal Status enum - 振込申請ステータス
+ */
+export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
+  "pending",    // 申請中
+  "processing", // 処理中
+  "completed",  // 完了
+  "rejected",   // 却下
+  "cancelled",  // キャンセル
+]);
+
+/**
+ * Creator Balance table - クリエイターの売上残高
+ */
+export const creatorBalances = pgTable("creator_balances", {
+  id: serial("id").primaryKey(),
+  creatorId: integer("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }).unique(),
+  availableBalance: integer("available_balance").default(0).notNull(), // 振込可能額（円）
+  pendingBalance: integer("pending_balance").default(0).notNull(), // 保留中（確定前）
+  totalEarned: integer("total_earned").default(0).notNull(), // 累計売上
+  totalWithdrawn: integer("total_withdrawn").default(0).notNull(), // 累計振込額
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type CreatorBalance = typeof creatorBalances.$inferSelect;
+export type InsertCreatorBalance = typeof creatorBalances.$inferInsert;
+
+/**
+ * Withdrawals table - 振込申請
+ */
+export const withdrawals = pgTable("withdrawals", {
+  id: serial("id").primaryKey(),
+  creatorId: integer("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
+  amount: integer("amount").notNull(), // 振込申請額（円）
+  fee: integer("fee").default(0).notNull(), // 振込手数料
+  netAmount: integer("net_amount").notNull(), // 実際の振込額（amount - fee）
+  status: withdrawalStatusEnum("status").default("pending").notNull(),
+  // 銀行口座情報
+  bankName: varchar("bank_name", { length: 64 }).notNull(),
+  branchName: varchar("branch_name", { length: 64 }).notNull(),
+  accountType: varchar("account_type", { length: 16 }).notNull(), // "普通" | "当座"
+  accountNumber: varchar("account_number", { length: 16 }).notNull(),
+  accountHolderName: varchar("account_holder_name", { length: 64 }).notNull(),
+  // 処理情報
+  processedAt: timestamp("processed_at"),
+  processedBy: integer("processed_by").references(() => users.id),
+  rejectionReason: text("rejection_reason"),
+  note: text("note"), // 管理者メモ
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type Withdrawal = typeof withdrawals.$inferSelect;
+export type InsertWithdrawal = typeof withdrawals.$inferInsert;
+
+/**
+ * Bank Accounts table - クリエイターの登録済み銀行口座
+ */
+export const bankAccounts = pgTable("bank_accounts", {
+  id: serial("id").primaryKey(),
+  creatorId: integer("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
+  bankName: varchar("bank_name", { length: 64 }).notNull(),
+  bankCode: varchar("bank_code", { length: 8 }),
+  branchName: varchar("branch_name", { length: 64 }).notNull(),
+  branchCode: varchar("branch_code", { length: 8 }),
+  accountType: varchar("account_type", { length: 16 }).notNull(), // "普通" | "当座"
+  accountNumber: varchar("account_number", { length: 16 }).notNull(),
+  accountHolderName: varchar("account_holder_name", { length: 64 }).notNull(),
+  isDefault: integer("is_default").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BankAccount = typeof bankAccounts.$inferSelect;
+export type InsertBankAccount = typeof bankAccounts.$inferInsert;
+
+/**
+ * Notification Type enum - 通知タイプ
+ */
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "follow",       // 新しいフォロワー
+  "like",         // いいね
+  "comment",      // コメント
+  "tip",          // チップ
+  "subscription", // 新規サブスク
+  "purchase",     // コンテンツ購入
+  "new_post",     // フォロー中のクリエイターの新規投稿
+  "system",       // システム通知
+]);
+
+/**
+ * Notifications table - 通知
+ */
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title", { length: 128 }).notNull(),
+  message: text("message"),
+  // 関連エンティティ
+  actorId: integer("actor_id").references(() => users.id), // アクションを起こしたユーザー
+  targetType: varchar("target_type", { length: 32 }), // "post" | "creator" | "comment" | null
+  targetId: integer("target_id"), // 対象のID
+  link: varchar("link", { length: 256 }), // 遷移先URL
+  // ステータス
+  isRead: integer("is_read").default(0).notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;

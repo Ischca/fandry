@@ -1,12 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { CreatorCard } from "@/components/CreatorCard";
 import { Header } from "@/components/Header";
 import { Input } from "@/components/ui/input";
 import { Loader2, Heart, Search } from "lucide-react";
+import { useSearch } from "wouter";
 
 export default function Discover() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchParams = useSearch();
+  const urlQuery = new URLSearchParams(searchParams).get("q") || "";
+  const [searchQuery, setSearchQuery] = useState(urlQuery);
+
+  // Update search query when URL changes
+  useEffect(() => {
+    setSearchQuery(urlQuery);
+  }, [urlQuery]);
   const { data: allCreators, isLoading } = trpc.discover.getAllCreators.useQuery({ limit: 50 });
   const { data: searchResults, isLoading: isSearching } = trpc.discover.searchCreators.useQuery(
     { query: searchQuery },

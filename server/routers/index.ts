@@ -16,3 +16,6 @@ export { revenueRouter } from "./revenue";
 export { pointRouter } from "./point";
 export { purchaseRouter } from "./purchase";
 export { subscriptionRouter } from "./subscription";
+export { withdrawalRouter } from "./withdrawal";
+export { receiptRouter } from "./receipt";
+export { notificationRouter } from "./notification";

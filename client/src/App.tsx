@@ -23,6 +23,8 @@ import Privacy from "./pages/Privacy";
 import PointPurchase from "./pages/PointPurchase";
 import BecomeCreator from "./pages/BecomeCreator";
 import SettingsProfile from "./pages/SettingsProfile";
+import Withdrawal from "./pages/Withdrawal";
+import Receipts from "./pages/Receipts";
 
 function Router() {
   return (
@@ -40,6 +42,8 @@ function Router() {
       <Route path={"/manage-plans"} component={ManagePlans} />
       <Route path={"/ranking"} component={Ranking} />
       <Route path={"/dashboard"} component={Dashboard} />
+      <Route path={"/withdrawal"} component={Withdrawal} />
+      <Route path={"/receipts"} component={Receipts} />
       <Route path={"/points"} component={PointPurchase} />
       <Route path={"/become-creator"} component={BecomeCreator} />
       <Route path={"/settings/profile"} component={SettingsProfile} />

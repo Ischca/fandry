@@ -111,16 +111,12 @@ export function PostCard({ post }: PostCardProps) {
       <Link href={`/creator/${post.creator.username}`}>
         <header className="group/creator relative p-4 pb-3 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors duration-200">
           {/* Avatar with ring effect on hover */}
-          <div className="relative">
-            <Avatar className="h-11 w-11 ring-2 ring-background shadow-md transition-all duration-300 group-hover/creator:ring-primary/50 group-hover/creator:scale-105">
-              <AvatarImage src={post.creator.avatarUrl || undefined} className="object-cover" />
-              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold text-sm">
-                {post.creator.displayName[0]}
-              </AvatarFallback>
-            </Avatar>
-            {/* Online indicator dot */}
-            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-card" />
-          </div>
+          <Avatar className="h-11 w-11 ring-2 ring-background shadow-md transition-all duration-300 group-hover/creator:ring-primary/50 group-hover/creator:scale-105">
+            <AvatarImage src={post.creator.avatarUrl || undefined} className="object-cover" />
+            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold text-sm">
+              {post.creator.displayName[0]}
+            </AvatarFallback>
+          </Avatar>
 
           {/* Creator info */}
           <div className="flex-1 min-w-0">

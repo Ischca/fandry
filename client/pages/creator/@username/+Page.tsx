@@ -1,5 +1,6 @@
 import { useData } from "vike-react/useData";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   User,
   Twitter,
@@ -9,7 +10,6 @@ import {
   Users,
   Sparkles,
   Crown,
-  Star,
   Zap,
 } from "lucide-react";
 import { Link } from "wouter";
@@ -24,6 +24,13 @@ import {
   ClientOnlyAuthActions,
   isSafeUrl,
 } from "./components";
+
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  available: { label: "依頼受付中", color: "bg-green-500" },
+  busy: { label: "制作中", color: "bg-yellow-500" },
+  closed: { label: "依頼停止中", color: "bg-red-500" },
+  custom: { label: "", color: "bg-blue-500" },
+};
 
 export default function CreatorPage() {
   const { creator, posts, plans } = useData<CreatorPageData>();
@@ -59,14 +66,37 @@ export default function CreatorPage() {
     socialLinks = {};
   }
 
+  // Parse skill tags
+  let skillTags: string[] = [];
+  try {
+    skillTags = creator.skillTags ? JSON.parse(creator.skillTags) : [];
+  } catch {
+    skillTags = [];
+  }
+
+  // Get accent color
+  const accentColor = creator.accentColor || "#E05A3A";
+
+  // Get status config
+  const statusConfig = creator.creatorStatus
+    ? STATUS_CONFIG[creator.creatorStatus]
+    : null;
+  const statusLabel =
+    creator.creatorStatus === "custom"
+      ? creator.statusMessage
+      : statusConfig?.label;
+
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div
+      className="min-h-screen bg-background pb-24"
+      style={{ "--creator-accent": accentColor } as React.CSSProperties}
+    >
       <Header />
 
-      {/* Hero Section */}
+      {/* Compact Hero Section */}
       <section className="relative">
-        {/* Cover Image */}
-        <div className="relative w-full h-[50vh] min-h-[400px] max-h-[600px] overflow-hidden">
+        {/* Cover - smaller height */}
+        <div className="relative h-32 md:h-40 overflow-hidden">
           {creator.coverUrl ? (
             <img
               src={creator.coverUrl}
@@ -74,16 +104,11 @@ export default function CreatorPage() {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-[oklch(0.85_0.16_85)]/20">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(224,90,58,0.15),transparent_50%)]" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_60%,rgba(200,150,50,0.1),transparent_50%)]" />
-            </div>
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-muted" />
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
 
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent" />
-
-          <div className="absolute top-6 right-6">
+          <div className="absolute top-4 right-4">
             <ShareDialog
               username={creator.username}
               displayName={creator.displayName}
@@ -91,12 +116,15 @@ export default function CreatorPage() {
           </div>
         </div>
 
-        {/* Profile Info Overlay */}
-        <div className="container relative -mt-32 z-10">
-          <div className="flex flex-col md:flex-row gap-8 items-start">
+        {/* Profile content - centered, compact */}
+        <div className="container max-w-2xl relative -mt-16 pb-6">
+          <div className="flex flex-col items-center text-center">
             {/* Avatar */}
-            <div className="relative">
-              <div className="w-40 h-40 md:w-48 md:h-48 rounded-3xl border-4 border-background bg-card shadow-2xl overflow-hidden">
+            <div className="relative mb-4">
+              <div
+                className="w-28 h-28 rounded-full bg-card shadow-xl overflow-hidden"
+                style={{ boxShadow: `0 0 0 4px ${accentColor}30` }}
+              >
                 {creator.avatarUrl ? (
                   <img
                     src={creator.avatarUrl}
@@ -104,125 +132,155 @@ export default function CreatorPage() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                    <User className="h-20 w-20 text-primary" />
+                  <div
+                    className="w-full h-full flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(135deg, ${accentColor}20, ${accentColor}05)`,
+                    }}
+                  >
+                    <User className="h-12 w-12" style={{ color: accentColor }} />
                   </div>
                 )}
               </div>
-              <div className="absolute -bottom-2 -right-2 w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-                <Star className="h-6 w-6 text-white fill-white" />
-              </div>
+              {/* Status indicator on avatar */}
+              {statusConfig && (
+                <div
+                  className={`absolute bottom-1 right-1 w-5 h-5 rounded-full ${statusConfig.color} ring-2 ring-background`}
+                  title={statusLabel || undefined}
+                />
+              )}
             </div>
 
-            {/* Info */}
-            <div className="flex-1 pt-4 md:pt-8 space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-                    {creator.displayName}
-                  </h1>
-                  {creator.category && (
-                    <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
-                      {creator.category}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xl text-muted-foreground">
-                  @{creator.username}
-                </p>
-              </div>
-
-              {creator.bio && (
-                <p className="text-lg text-foreground/80 leading-relaxed max-w-2xl">
-                  {creator.bio}
+            {/* Identity */}
+            <div className="space-y-1">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                {creator.displayName}
+              </h1>
+              {/* Creator title */}
+              {creator.creatorTitle && (
+                <p className="text-sm font-medium" style={{ color: accentColor }}>
+                  {creator.creatorTitle}
                 </p>
               )}
+              <p className="text-muted-foreground text-sm">@{creator.username}</p>
+            </div>
 
-              {/* Stats */}
-              <div className="flex flex-wrap items-center gap-6 pt-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {creator.followerCount.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">フォロワー</p>
-                  </div>
-                </div>
+            {/* Status badge */}
+            {statusLabel && (
+              <div className="mt-3">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-full text-white ${statusConfig?.color || "bg-blue-500"}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
+                  {statusLabel}
+                </span>
+              </div>
+            )}
 
-                {creator.totalSupport > 0 && (
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-[oklch(0.85_0.16_85)]/20 flex items-center justify-center">
-                      <Zap className="h-5 w-5 text-[oklch(0.7_0.14_85)]" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">
-                        ¥{creator.totalSupport.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">累計支援</p>
-                    </div>
-                  </div>
+            {/* Category badge */}
+            {creator.category && (
+              <div className="mt-2">
+                <span className="inline-block px-3 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded-full">
+                  {creator.category}
+                </span>
+              </div>
+            )}
+
+            {/* Skill tags */}
+            {skillTags.length > 0 && (
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5 max-w-md">
+                {skillTags.slice(0, 6).map((tag, index) => (
+                  <Badge key={index} variant="outline" className="text-xs font-normal">
+                    {tag}
+                  </Badge>
+                ))}
+                {skillTags.length > 6 && (
+                  <Badge variant="outline" className="text-xs font-normal">
+                    +{skillTags.length - 6}
+                  </Badge>
                 )}
+              </div>
+            )}
 
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                    <Sparkles className="h-5 w-5 text-violet-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{posts?.length || 0}</p>
-                    <p className="text-xs text-muted-foreground">投稿</p>
-                  </div>
-                </div>
+            {/* Bio */}
+            {creator.bio && (
+              <p className="mt-4 text-muted-foreground max-w-md leading-relaxed">
+                {creator.bio}
+              </p>
+            )}
+
+            {/* Stats */}
+            <div className="mt-6 flex items-center justify-center gap-6">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="font-semibold">
+                  {creator.followerCount.toLocaleString()}
+                </span>
+                <span className="text-xs text-muted-foreground">フォロワー</span>
               </div>
 
-              {/* Social Links */}
-              {Object.keys(socialLinks).length > 0 && (
-                <div className="flex items-center gap-2 pt-2">
-                  {socialLinks.twitter && isSafeUrl(socialLinks.twitter) && (
-                    <a
-                      href={socialLinks.twitter}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-11 h-11 rounded-xl bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
-                    >
-                      <Twitter className="h-5 w-5" />
-                    </a>
-                  )}
-                  {socialLinks.instagram && isSafeUrl(socialLinks.instagram) && (
-                    <a
-                      href={socialLinks.instagram}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-11 h-11 rounded-xl bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
-                    >
-                      <Instagram className="h-5 w-5" />
-                    </a>
-                  )}
-                  {socialLinks.youtube && isSafeUrl(socialLinks.youtube) && (
-                    <a
-                      href={socialLinks.youtube}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-11 h-11 rounded-xl bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
-                    >
-                      <Youtube className="h-5 w-5" />
-                    </a>
-                  )}
-                  {socialLinks.website && isSafeUrl(socialLinks.website) && (
-                    <a
-                      href={socialLinks.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-11 h-11 rounded-xl bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
-                    >
-                      <Globe className="h-5 w-5" />
-                    </a>
-                  )}
+              {creator.totalSupport > 0 && (
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-semibold">
+                    ¥{creator.totalSupport.toLocaleString()}
+                  </span>
+                  <span className="text-xs text-muted-foreground">累計支援</span>
                 </div>
               )}
+
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                <span className="font-semibold">{posts?.length || 0}</span>
+                <span className="text-xs text-muted-foreground">投稿</span>
+              </div>
             </div>
+
+            {/* Social Links */}
+            {Object.keys(socialLinks).length > 0 && (
+              <div className="mt-4 flex items-center justify-center gap-2">
+                {socialLinks.twitter && isSafeUrl(socialLinks.twitter) && (
+                  <a
+                    href={socialLinks.twitter}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 rounded-lg bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                  >
+                    <Twitter className="h-4 w-4" />
+                  </a>
+                )}
+                {socialLinks.instagram && isSafeUrl(socialLinks.instagram) && (
+                  <a
+                    href={socialLinks.instagram}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 rounded-lg bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                  >
+                    <Instagram className="h-4 w-4" />
+                  </a>
+                )}
+                {socialLinks.youtube && isSafeUrl(socialLinks.youtube) && (
+                  <a
+                    href={socialLinks.youtube}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 rounded-lg bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                  >
+                    <Youtube className="h-4 w-4" />
+                  </a>
+                )}
+                {socialLinks.website && isSafeUrl(socialLinks.website) && (
+                  <a
+                    href={socialLinks.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 rounded-lg bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                  >
+                    <Globe className="h-4 w-4" />
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>

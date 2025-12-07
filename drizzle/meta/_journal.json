@@ -29,6 +29,27 @@
       "when": 1764814503962,
       "tag": "0003_mature_silk_fever",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1765078690126,
+      "tag": "0004_romantic_selene",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1765098541327,
+      "tag": "0005_motionless_celestials",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1765099800000,
+      "tag": "0006_add_accent_color",
+      "breakpoints": true
     }
   ]
 }

@@ -49,6 +49,81 @@ function validateSocialLinks(jsonStr: string): string {
   return JSON.stringify(sanitized);
 }
 
+// Validate skill tags JSON
+function validateSkillTags(jsonStr: string): string {
+  const parsed = JSON.parse(jsonStr);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Skill tags must be an array");
+  }
+
+  if (parsed.length > 10) {
+    throw new Error("Maximum 10 skill tags allowed");
+  }
+
+  const sanitized = parsed
+    .filter((tag): tag is string => typeof tag === "string" && tag.trim().length > 0)
+    .map(tag => tag.trim().slice(0, 32));
+
+  return JSON.stringify(sanitized);
+}
+
+// Validate featured post IDs JSON
+function validateFeaturedPostIds(jsonStr: string): string {
+  const parsed = JSON.parse(jsonStr);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Featured post IDs must be an array");
+  }
+
+  if (parsed.length > 3) {
+    throw new Error("Maximum 3 featured posts allowed");
+  }
+
+  const sanitized = parsed
+    .filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0);
+
+  return JSON.stringify(sanitized);
+}
+
+// Valid creator status values
+const VALID_STATUSES = ["available", "busy", "closed", "custom"] as const;
+
+// Validate and sanitize profile links JSON (litlink-style custom links)
+function validateProfileLinks(jsonStr: string): string {
+  const parsed = JSON.parse(jsonStr);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Profile links must be an array");
+  }
+
+  if (parsed.length > 10) {
+    throw new Error("Maximum 10 profile links allowed");
+  }
+
+  const sanitized = parsed.map((link, index) => {
+    if (!link.id || typeof link.id !== "string") {
+      throw new Error(`Link ${index + 1}: missing id`);
+    }
+    if (!link.title || typeof link.title !== "string") {
+      throw new Error(`Link ${index + 1}: missing title`);
+    }
+    if (!link.url || typeof link.url !== "string") {
+      throw new Error(`Link ${index + 1}: missing url`);
+    }
+    if (!isValidUrl(link.url)) {
+      throw new Error(`Link ${index + 1}: invalid URL (must be http or https)`);
+    }
+
+    return {
+      id: link.id.slice(0, 64),
+      title: link.title.slice(0, 50),
+      url: link.url.slice(0, 500),
+      icon: typeof link.icon === "string" ? link.icon.slice(0, 32) : "link",
+      color: typeof link.color === "string" ? link.color.slice(0, 16) : undefined,
+    };
+  });
+
+  return JSON.stringify(sanitized);
+}
+
 export const creatorRouter = router({
   getByUsername: publicProcedure
     .input(z.object({ username: z.string() }))
@@ -99,7 +174,17 @@ export const creatorRouter = router({
       avatarUrl: z.string().optional(),
       coverUrl: z.string().optional(),
       category: z.string().optional(),
-      socialLinks: z.string().optional(),
+      socialLinks: z.string().optional().nullable(),
+      profileLinks: z.string().optional().nullable(),
+      showStats: z.number().min(0).max(1).optional(),
+      showPosts: z.number().min(0).max(1).optional(),
+      // Creator identity fields
+      creatorTitle: z.string().max(64).optional().nullable(),
+      skillTags: z.string().optional().nullable(), // JSON array
+      creatorStatus: z.enum(["available", "busy", "closed", "custom"]).optional().nullable(),
+      statusMessage: z.string().max(100).optional().nullable(),
+      featuredPostIds: z.string().optional().nullable(), // JSON array of post IDs
+      accentColor: z.string().max(16).optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       const creator = await getDb().then(db =>
@@ -114,6 +199,33 @@ export const creatorRouter = router({
           sanitizedInput.socialLinks = validateSocialLinks(input.socialLinks);
         } catch (error) {
           throwBadRequest(error instanceof Error ? error.message : "Invalid social links");
+        }
+      }
+
+      // Validate and sanitize profile links if provided
+      if (input.profileLinks) {
+        try {
+          sanitizedInput.profileLinks = validateProfileLinks(input.profileLinks);
+        } catch (error) {
+          throwBadRequest(error instanceof Error ? error.message : "Invalid profile links");
+        }
+      }
+
+      // Validate skill tags if provided
+      if (input.skillTags) {
+        try {
+          sanitizedInput.skillTags = validateSkillTags(input.skillTags);
+        } catch (error) {
+          throwBadRequest(error instanceof Error ? error.message : "Invalid skill tags");
+        }
+      }
+
+      // Validate featured post IDs if provided
+      if (input.featuredPostIds) {
+        try {
+          sanitizedInput.featuredPostIds = validateFeaturedPostIds(input.featuredPostIds);
+        } catch (error) {
+          throwBadRequest(error instanceof Error ? error.message : "Invalid featured posts");
         }
       }
 

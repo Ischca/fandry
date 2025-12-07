@@ -51,6 +51,18 @@ export const creators = pgTable("creators", {
   coverUrl: text("cover_url"),
   category: varchar("category", { length: 64 }),
   socialLinks: text("social_links"), // JSON string
+  // Creator identity
+  creatorTitle: varchar("creator_title", { length: 64 }), // 肩書き: "イラストレーター", "VTuber"
+  skillTags: text("skill_tags"), // JSON: ["Photoshop", "Live2D", "ファンタジー"]
+  creatorStatus: varchar("creator_status", { length: 32 }), // "available" | "busy" | "closed" | "custom"
+  statusMessage: varchar("status_message", { length: 100 }), // カスタムステータスメッセージ
+  // Profile customization (litlink-like)
+  profileLinks: text("profile_links"), // JSON: [{id, title, url, icon?, color?}]
+  accentColor: varchar("accent_color", { length: 16 }), // Hex color e.g. "#E05A3A"
+  headerStyle: varchar("header_style", { length: 16 }).default("compact"), // "compact" | "full" | "minimal"
+  showStats: integer("show_stats").default(1).notNull(), // 統計を表示するか
+  showPosts: integer("show_posts").default(1).notNull(), // 投稿セクションを表示するか
+  featuredPostIds: text("featured_post_ids"), // JSON: [postId, postId, ...]
   isAdult: integer("is_adult").default(0).notNull(), // アダルトクリエイター
   totalSupport: integer("total_support").default(0).notNull(), // 累計支援額（円）
   followerCount: integer("follower_count").default(0).notNull(),

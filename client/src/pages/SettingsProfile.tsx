@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
 import { Header } from "@/components/Header";
 import {
@@ -22,6 +23,14 @@ import {
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { CREATOR_CATEGORIES } from "@shared/const";
+import {
+  CustomLinksEditor,
+  type ProfileLink,
+  CreatorIdentityEditor,
+  type CreatorStatus,
+  FeaturedPostsEditor,
+  ThemeEditor,
+} from "./settings-components";
 
 // Validate URL to only allow http/https protocols
 function isValidUrl(url: string): boolean {
@@ -56,6 +65,16 @@ export default function SettingsProfile() {
     youtube: "",
     website: "",
   });
+  const [profileLinks, setProfileLinks] = useState<ProfileLink[]>([]);
+  const [showStats, setShowStats] = useState(true);
+  const [showPosts, setShowPosts] = useState(true);
+  // Creator identity
+  const [creatorTitle, setCreatorTitle] = useState("");
+  const [skillTags, setSkillTags] = useState<string[]>([]);
+  const [creatorStatus, setCreatorStatus] = useState<CreatorStatus>("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [featuredPostIds, setFeaturedPostIds] = useState<number[]>([]);
+  const [accentColor, setAccentColor] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -76,6 +95,31 @@ export default function SettingsProfile() {
     } catch {
       // Invalid JSON, ignore
     }
+    try {
+      const customLinks = creator.profileLinks ? JSON.parse(creator.profileLinks) : [];
+      setProfileLinks(customLinks);
+    } catch {
+      // Invalid JSON, ignore
+    }
+    setShowStats(creator.showStats !== 0);
+    setShowPosts(creator.showPosts !== 0);
+    // Creator identity
+    setCreatorTitle(creator.creatorTitle || "");
+    try {
+      const tags = creator.skillTags ? JSON.parse(creator.skillTags) : [];
+      setSkillTags(tags);
+    } catch {
+      // Invalid JSON, ignore
+    }
+    setCreatorStatus((creator.creatorStatus as CreatorStatus) || "");
+    setStatusMessage(creator.statusMessage || "");
+    try {
+      const ids = creator.featuredPostIds ? JSON.parse(creator.featuredPostIds) : [];
+      setFeaturedPostIds(ids);
+    } catch {
+      // Invalid JSON, ignore
+    }
+    setAccentColor(creator.accentColor || "");
     setIsInitialized(true);
   }
 
@@ -183,6 +227,19 @@ export default function SettingsProfile() {
       }
     });
 
+    // Validate profile links
+    for (const link of profileLinks) {
+      if (link.url.trim() && !isValidUrl(link.url)) {
+        toast.error(`リンク「${link.title || "無題"}」のURLが無効です`);
+        return;
+      }
+    }
+
+    // Filter profile links with valid URLs
+    const validProfileLinks = profileLinks.filter(
+      link => link.title.trim() && link.url.trim()
+    );
+
     updateMutation.mutate({
       displayName: displayName.trim() || undefined,
       bio: bio.trim() || undefined,
@@ -191,7 +248,19 @@ export default function SettingsProfile() {
       coverUrl: coverUrl || undefined,
       socialLinks: Object.keys(filteredSocialLinks).length > 0
         ? JSON.stringify(filteredSocialLinks)
-        : undefined,
+        : null,
+      profileLinks: validProfileLinks.length > 0
+        ? JSON.stringify(validProfileLinks)
+        : null,
+      showStats: showStats ? 1 : 0,
+      showPosts: showPosts ? 1 : 0,
+      // Creator identity
+      creatorTitle: creatorTitle.trim() || null,
+      skillTags: skillTags.length > 0 ? JSON.stringify(skillTags) : null,
+      creatorStatus: creatorStatus || null,
+      statusMessage: creatorStatus === "custom" ? statusMessage.trim() : null,
+      featuredPostIds: featuredPostIds.length > 0 ? JSON.stringify(featuredPostIds) : null,
+      accentColor: accentColor || null,
     });
   };
 
@@ -385,6 +454,24 @@ export default function SettingsProfile() {
             </div>
           </Card>
 
+          {/* Creator Identity */}
+          <CreatorIdentityEditor
+            creatorTitle={creatorTitle}
+            onTitleChange={setCreatorTitle}
+            skillTags={skillTags}
+            onSkillTagsChange={setSkillTags}
+            creatorStatus={creatorStatus}
+            onStatusChange={setCreatorStatus}
+            statusMessage={statusMessage}
+            onStatusMessageChange={setStatusMessage}
+          />
+
+          {/* Featured Posts */}
+          <FeaturedPostsEditor
+            featuredPostIds={featuredPostIds}
+            onChange={setFeaturedPostIds}
+          />
+
           {/* Social Links */}
           <Card className="p-6 space-y-4">
             <h2 className="font-semibold">SNSリンク</h2>
@@ -435,6 +522,56 @@ export default function SettingsProfile() {
               </div>
             </div>
           </Card>
+
+          {/* Custom Links (litlink-style) */}
+          <CustomLinksEditor
+            links={profileLinks}
+            onChange={setProfileLinks}
+          />
+
+          {/* Display Options */}
+          <Card className="p-6 space-y-4">
+            <h2 className="font-semibold">表示設定</h2>
+            <p className="text-sm text-muted-foreground">
+              プロフィールページに表示する情報を選択
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="showStats">統計情報を表示</Label>
+                  <p className="text-xs text-muted-foreground">
+                    フォロワー数やサポート金額を表示
+                  </p>
+                </div>
+                <Switch
+                  id="showStats"
+                  checked={showStats}
+                  onCheckedChange={setShowStats}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="showPosts">投稿を表示</Label>
+                  <p className="text-xs text-muted-foreground">
+                    プロフィールに作品ギャラリーを表示
+                  </p>
+                </div>
+                <Switch
+                  id="showPosts"
+                  checked={showPosts}
+                  onCheckedChange={setShowPosts}
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Theme */}
+          <ThemeEditor
+            accentColor={accentColor}
+            onAccentColorChange={setAccentColor}
+          />
 
           {/* Actions */}
           <div className="flex gap-4">

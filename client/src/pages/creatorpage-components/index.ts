@@ -1,3 +1,12 @@
 export { isSafeUrl } from "./utils";
 export { PlanCard } from "./PlanCard";
 export { SocialLinks } from "./SocialLinks";
+export { HeroSection } from "./HeroSection";
+export { CompactHero } from "./CompactHero";
+export { AboutStrip } from "./AboutStrip";
+export { WorksGallery } from "./WorksGallery";
+export { MembershipSection } from "./MembershipSection";
+export { FloatingActions } from "./FloatingActions";
+export { ProfileLinks } from "./ProfileLinks";
+export { StatsBar } from "./StatsBar";
+export { FeaturedPosts } from "./FeaturedPosts";

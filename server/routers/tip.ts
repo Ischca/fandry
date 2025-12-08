@@ -124,7 +124,7 @@ export const tipRouter = router({
   sendWithPoints: protectedProcedure
     .input(z.object({
       creatorId: z.number(),
-      amount: z.number().min(100),
+      amount: z.number().min(100).max(1_000_000_000),
       message: z.string().max(500).optional(),
       idempotencyKey: z.string().optional(),
     }))
@@ -213,7 +213,7 @@ export const tipRouter = router({
   createStripeCheckout: protectedProcedure
     .input(z.object({
       creatorId: z.number(),
-      amount: z.number().min(100),
+      amount: z.number().min(100).max(1_000_000_000),
       message: z.string().max(500).optional(),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
@@ -303,8 +303,8 @@ export const tipRouter = router({
   createHybridCheckout: protectedProcedure
     .input(z.object({
       creatorId: z.number(),
-      amount: z.number().min(100),
-      pointsToUse: z.number().min(0),
+      amount: z.number().min(100).max(1_000_000_000),
+      pointsToUse: z.number().min(0).max(1_000_000_000),
       message: z.string().max(500).optional(),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),

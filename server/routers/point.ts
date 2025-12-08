@@ -167,7 +167,7 @@ export const pointRouter = router({
   // Credit points to user (called after successful payment via webhook or manually for testing)
   creditPoints: protectedProcedure
     .input(z.object({
-      amount: z.number().min(1),
+      amount: z.number().min(1).max(1_000_000_000),
       description: z.string().optional(),
       stripePaymentIntentId: z.string().optional(),
     }))
@@ -221,7 +221,7 @@ export const pointRouter = router({
   // Deduct points from user (internal use)
   deductPoints: protectedProcedure
     .input(z.object({
-      amount: z.number().min(1),
+      amount: z.number().min(1).max(1_000_000_000),
       type: z.enum(["post_purchase", "subscription", "tip"]),
       referenceId: z.number().optional(),
       description: z.string().optional(),

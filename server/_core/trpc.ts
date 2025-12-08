@@ -3,8 +3,32 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  errorFormatter({ shape, error }) {
+    // In production, hide internal error details
+    if (isProduction && error.code === "INTERNAL_SERVER_ERROR") {
+      return {
+        ...shape,
+        message: "An internal error occurred",
+        data: {
+          ...shape.data,
+          // Don't expose stack traces in production
+          stack: undefined,
+        },
+      };
+    }
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        // Never expose stack traces to clients
+        stack: isProduction ? undefined : shape.data.stack,
+      },
+    };
+  },
 });
 
 export const router = t.router;

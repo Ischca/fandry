@@ -172,7 +172,7 @@ export const adminPaymentRouter = router({
     .input(
       z.object({
         auditLogId: z.number(),
-        amount: z.number().min(1),
+        amount: z.number().min(1).max(1_000_000_000),
         reason: z.string().min(1),
       })
     )
@@ -260,7 +260,7 @@ export const adminPaymentRouter = router({
     .input(
       z.object({
         userId: z.number(),
-        amount: z.number().min(1),
+        amount: z.number().min(1).max(1_000_000_000),
         reason: z.string().min(1),
         relatedAuditLogId: z.number().optional(),
       })

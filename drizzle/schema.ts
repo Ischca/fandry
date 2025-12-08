@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { bigint, integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 // Enums
 export const roleEnum = pgEnum("role", ["user", "admin"]);
@@ -74,7 +74,7 @@ export const creators = pgTable("creators", {
   showPosts: integer("show_posts").default(1).notNull(), // 投稿セクションを表示するか
   featuredPostIds: text("featured_post_ids"), // JSON: [postId, postId, ...]
   isAdult: integer("is_adult").default(0).notNull(), // アダルトクリエイター
-  totalSupport: integer("total_support").default(0).notNull(), // 累計支援額（円）
+  totalSupport: bigint("total_support", { mode: "number" }).default(0).notNull(), // 累計支援額（円）
   followerCount: integer("follower_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -92,7 +92,7 @@ export const posts = pgTable("posts", {
   title: varchar("title", { length: 256 }),
   content: text("content").notNull(),
   type: postTypeEnum("type").default("free").notNull(),
-  price: integer("price").default(0), // 価格（円）
+  price: bigint("price", { mode: "number" }).default(0), // 価格（円）
   membershipTier: integer("membership_tier").default(0), // 必要な会員ランク
   mediaUrls: text("media_urls"), // JSON array of URLs
   isAdult: integer("is_adult").default(0).notNull(), // アダルトコンテンツ
@@ -115,7 +115,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   creatorId: integer("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 128 }).notNull(),
   description: text("description"),
-  price: integer("price").notNull(), // 月額料金（円）
+  price: bigint("price", { mode: "number" }).notNull(), // 月額料金（円）
   tier: integer("tier").notNull(), // ランク（1, 2, 3...）
   benefits: text("benefits"), // JSON array of benefits
   isAdult: integer("is_adult").default(0).notNull(), // アダルトプラン
@@ -159,12 +159,12 @@ export const tips = pgTable("tips", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   creatorId: integer("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
-  amount: integer("amount").notNull(), // 金額（円）
+  amount: bigint("amount", { mode: "number" }).notNull(), // 金額（円）
   message: text("message"),
   isRecurring: integer("is_recurring").default(0).notNull(), // 定期投げ銭かどうか
   paymentMethod: varchar("payment_method", { length: 16 }), // "points" | "stripe" | "hybrid"
-  pointsUsed: integer("points_used").default(0),
-  stripeAmount: integer("stripe_amount").default(0),
+  pointsUsed: bigint("points_used", { mode: "number" }).default(0),
+  stripeAmount: bigint("stripe_amount", { mode: "number" }).default(0),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
   // トレーサビリティ拡張
   status: transactionStatusEnum("status").default("completed"), // 既存データ互換のためdefault="completed"
@@ -182,10 +182,10 @@ export const purchases = pgTable("purchases", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   postId: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
-  amount: integer("amount").notNull(),
+  amount: bigint("amount", { mode: "number" }).notNull(),
   paymentMethod: varchar("payment_method", { length: 16 }), // "points" | "stripe" | "hybrid"
-  pointsUsed: integer("points_used").default(0),
-  stripeAmount: integer("stripe_amount").default(0),
+  pointsUsed: bigint("points_used", { mode: "number" }).default(0),
+  stripeAmount: bigint("stripe_amount", { mode: "number" }).default(0),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
   // トレーサビリティ拡張
   status: transactionStatusEnum("status").default("completed"), // 既存データ互換のためdefault="completed"
@@ -311,9 +311,9 @@ export type InsertBlock = typeof blocks.$inferInsert;
 export const userPoints = pgTable("user_points", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
-  balance: integer("balance").default(0).notNull(),
-  totalPurchased: integer("total_purchased").default(0).notNull(), // 累計購入ポイント
-  totalSpent: integer("total_spent").default(0).notNull(), // 累計消費ポイント
+  balance: bigint("balance", { mode: "number" }).default(0).notNull(),
+  totalPurchased: bigint("total_purchased", { mode: "number" }).default(0).notNull(), // 累計購入ポイント
+  totalSpent: bigint("total_spent", { mode: "number" }).default(0).notNull(), // 累計消費ポイント
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -327,8 +327,8 @@ export const pointTransactions = pgTable("point_transactions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: pointTransactionTypeEnum("type").notNull(),
-  amount: integer("amount").notNull(), // 正:獲得, 負:消費
-  balanceAfter: integer("balance_after").notNull(),
+  amount: bigint("amount", { mode: "number" }).notNull(), // 正:獲得, 負:消費
+  balanceAfter: bigint("balance_after", { mode: "number" }).notNull(),
   referenceId: integer("reference_id"), // 関連するtip/purchase/subscription ID
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
   description: text("description"),
@@ -347,8 +347,8 @@ export type InsertPointTransaction = typeof pointTransactions.$inferInsert;
 export const pointPackages = pgTable("point_packages", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 64 }).notNull(),
-  points: integer("points").notNull(),
-  priceJpy: integer("price_jpy").notNull(), // 1pt = 1円
+  points: bigint("points", { mode: "number" }).notNull(),
+  priceJpy: bigint("price_jpy", { mode: "number" }).notNull(), // 1pt = 1円
   stripePriceId: varchar("stripe_price_id", { length: 128 }),
   isActive: integer("is_active").default(1).notNull(),
   displayOrder: integer("display_order").default(0).notNull(),
@@ -376,10 +376,10 @@ export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
 export const creatorBalances = pgTable("creator_balances", {
   id: serial("id").primaryKey(),
   creatorId: integer("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }).unique(),
-  availableBalance: integer("available_balance").default(0).notNull(), // 振込可能額（円）
-  pendingBalance: integer("pending_balance").default(0).notNull(), // 保留中（確定前）
-  totalEarned: integer("total_earned").default(0).notNull(), // 累計売上
-  totalWithdrawn: integer("total_withdrawn").default(0).notNull(), // 累計振込額
+  availableBalance: bigint("available_balance", { mode: "number" }).default(0).notNull(), // 振込可能額（円）
+  pendingBalance: bigint("pending_balance", { mode: "number" }).default(0).notNull(), // 保留中（確定前）
+  totalEarned: bigint("total_earned", { mode: "number" }).default(0).notNull(), // 累計売上
+  totalWithdrawn: bigint("total_withdrawn", { mode: "number" }).default(0).notNull(), // 累計振込額
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -392,9 +392,9 @@ export type InsertCreatorBalance = typeof creatorBalances.$inferInsert;
 export const withdrawals = pgTable("withdrawals", {
   id: serial("id").primaryKey(),
   creatorId: integer("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
-  amount: integer("amount").notNull(), // 振込申請額（円）
-  fee: integer("fee").default(0).notNull(), // 振込手数料
-  netAmount: integer("net_amount").notNull(), // 実際の振込額（amount - fee）
+  amount: bigint("amount", { mode: "number" }).notNull(), // 振込申請額（円）
+  fee: bigint("fee", { mode: "number" }).default(0).notNull(), // 振込手数料
+  netAmount: bigint("net_amount", { mode: "number" }).notNull(), // 実際の振込額（amount - fee）
   status: withdrawalStatusEnum("status").default("pending").notNull(),
   // 銀行口座情報
   bankName: varchar("bank_name", { length: 64 }).notNull(),
@@ -523,9 +523,9 @@ export const paymentAuditLogs = pgTable("payment_audit_logs", {
   userId: integer("user_id").references(() => users.id),
   creatorId: integer("creator_id").references(() => creators.id),
   // 金額情報
-  totalAmount: integer("total_amount").notNull(), // 合計金額（円）
-  pointsAmount: integer("points_amount").default(0).notNull(), // ポイント使用額
-  stripeAmount: integer("stripe_amount").default(0).notNull(), // Stripe決済額
+  totalAmount: bigint("total_amount", { mode: "number" }).notNull(), // 合計金額（円）
+  pointsAmount: bigint("points_amount", { mode: "number" }).default(0).notNull(), // ポイント使用額
+  stripeAmount: bigint("stripe_amount", { mode: "number" }).default(0).notNull(), // Stripe決済額
   // 参照情報
   referenceType: varchar("reference_type", { length: 32 }), // "purchase" | "tip" | "subscription" | "point_transaction"
   referenceId: integer("reference_id"), // 該当レコードのID

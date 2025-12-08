@@ -15,6 +15,7 @@ import {
   withdrawals,
   bankAccounts,
 } from "../../drizzle/schema";
+import { encrypt, decrypt, maskAccountNumber, isEncrypted } from "../lib/crypto";
 
 // 振込手数料（円）
 const WITHDRAWAL_FEE = 300;
@@ -77,7 +78,15 @@ export const withdrawalRouter = router({
       .where(eq(bankAccounts.creatorId, creator.id))
       .orderBy(sql`${bankAccounts.isDefault} DESC, ${bankAccounts.createdAt} DESC`);
 
-    return accounts;
+    // Mask account numbers for display
+    return accounts.map((account) => ({
+      ...account,
+      accountNumber: maskAccountNumber(
+        isEncrypted(account.accountNumber)
+          ? decrypt(account.accountNumber)
+          : account.accountNumber
+      ),
+    }));
   }),
 
   // 銀行口座を登録
@@ -113,6 +122,9 @@ export const withdrawalRouter = router({
           .where(eq(bankAccounts.creatorId, creator.id));
       }
 
+      // Encrypt account number before storing
+      const encryptedAccountNumber = encrypt(input.accountNumber);
+
       const [account] = await db
         .insert(bankAccounts)
         .values({
@@ -122,13 +134,17 @@ export const withdrawalRouter = router({
           branchName: input.branchName,
           branchCode: input.branchCode,
           accountType: input.accountType,
-          accountNumber: input.accountNumber,
+          accountNumber: encryptedAccountNumber,
           accountHolderName: input.accountHolderName,
           isDefault: input.isDefault ? 1 : 0,
         })
         .returning();
 
-      return account;
+      // Return with masked account number
+      return {
+        ...account,
+        accountNumber: maskAccountNumber(input.accountNumber),
+      };
     }),
 
   // 銀行口座を削除
@@ -224,14 +240,22 @@ export const withdrawalRouter = router({
         .orderBy(sql`${withdrawals.createdAt} DESC`)
         .limit(limit);
 
-      return results;
+      // Mask account numbers for display
+      return results.map((withdrawal) => ({
+        ...withdrawal,
+        accountNumber: maskAccountNumber(
+          isEncrypted(withdrawal.accountNumber)
+            ? decrypt(withdrawal.accountNumber)
+            : withdrawal.accountNumber
+        ),
+      }));
     }),
 
   // 振込申請を作成
   requestWithdrawal: protectedProcedure
     .input(
       z.object({
-        amount: z.number().min(MIN_WITHDRAWAL_AMOUNT),
+        amount: z.number().min(MIN_WITHDRAWAL_AMOUNT).max(1_000_000_000),
         bankAccountId: z.number(),
       })
     )
@@ -276,6 +300,16 @@ export const withdrawalRouter = router({
         throwBadRequest("振込金額が手数料を下回っています");
       }
 
+      // Decrypt account number for withdrawal record (stored encrypted in withdrawals table too)
+      const decryptedAccountNumber = isEncrypted(account.accountNumber)
+        ? decrypt(account.accountNumber)
+        : account.accountNumber;
+
+      // Store encrypted account number in withdrawal record
+      const encryptedAccountNumber = isEncrypted(account.accountNumber)
+        ? account.accountNumber
+        : encrypt(decryptedAccountNumber);
+
       // 振込申請を作成
       const [withdrawal] = await db
         .insert(withdrawals)
@@ -287,7 +321,7 @@ export const withdrawalRouter = router({
           bankName: account.bankName,
           branchName: account.branchName,
           accountType: account.accountType,
-          accountNumber: account.accountNumber,
+          accountNumber: encryptedAccountNumber,
           accountHolderName: account.accountHolderName,
         })
         .returning();

@@ -409,7 +409,11 @@ router.post(
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err) {
       console.error("Webhook signature verification failed:", err);
-      return res.status(400).send(`Webhook Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+      // Don't expose internal error details in production
+      const errorMessage = process.env.NODE_ENV === "production"
+        ? "Webhook verification failed"
+        : `Webhook Error: ${err instanceof Error ? err.message : "Unknown error"}`;
+      return res.status(400).send(errorMessage);
     }
 
     // Handle the event

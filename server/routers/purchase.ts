@@ -400,7 +400,7 @@ export const purchaseRouter = router({
   createHybridCheckout: protectedProcedure
     .input(z.object({
       postId: z.number(),
-      pointsToUse: z.number().min(0),
+      pointsToUse: z.number().min(0).max(1_000_000_000),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
       idempotencyKey: z.string().optional(),

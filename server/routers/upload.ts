@@ -14,10 +14,12 @@ import {
 import {
   generatePresignedUploadUrl,
   validateFileType,
+  validateMagicBytes,
   isR2Configured,
   ALLOWED_MIME_TYPES,
   MAX_IMAGE_SIZE,
   MAX_VIDEO_SIZE,
+  MAGIC_BYTES,
 } from "../upload";
 
 export const uploadRouter = router({
@@ -26,7 +28,26 @@ export const uploadRouter = router({
     allowedTypes: ALLOWED_MIME_TYPES,
     maxImageSize: MAX_IMAGE_SIZE,
     maxVideoSize: MAX_VIDEO_SIZE,
+    magicBytes: MAGIC_BYTES,
   })),
+
+  // Validate file magic bytes before upload
+  validateMagicBytes: protectedProcedure
+    .input(z.object({
+      mimeType: z.string(),
+      // First 16 bytes of the file as base64
+      headerBytes: z.string(),
+    }))
+    .mutation(({ input }) => {
+      const buffer = Buffer.from(input.headerBytes, "base64");
+      const isValid = validateMagicBytes(new Uint8Array(buffer), input.mimeType);
+
+      if (!isValid) {
+        throwBadRequest("File content does not match claimed type. Please upload a valid file.");
+      }
+
+      return { valid: true };
+    }),
 
   getPresignedUrl: protectedProcedure
     .input(z.object({

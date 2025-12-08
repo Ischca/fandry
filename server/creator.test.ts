@@ -102,7 +102,10 @@ describe("tip router", () => {
 
     const creator = await caller.creator.getByUsername({ username });
 
-    const result = await caller.tip.create({
+    // Credit points first
+    await caller.point.creditPoints({ amount: 1000 });
+
+    const result = await caller.tip.sendWithPoints({
       creatorId: creator.id,
       amount: 500,
       message: "Great work!",
@@ -124,8 +127,10 @@ describe("tip router", () => {
 
     const creator = await caller.creator.getByUsername({ username });
 
+    await caller.point.creditPoints({ amount: 1000 });
+
     await expect(
-      caller.tip.create({
+      caller.tip.sendWithPoints({
         creatorId: creator.id,
         amount: 50, // Below minimum of 100
       })

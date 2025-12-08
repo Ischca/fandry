@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
-import { upsertUser, createCreator, createPost, followCreator } from "./db";
+import { upsertUser, createCreator, createPost, followCreator, getUserByOpenId } from "./db";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
@@ -29,32 +29,36 @@ function createAuthContext(userId: number, openId: string): TrpcContext {
 }
 
 describe("Feed and Discover", () => {
+  // Use unique IDs per test run to avoid state pollution
+  const testRunId = Date.now();
   let user1Id: number;
   let user2Id: number;
+  let user3Id: number; // Fresh user for empty feed test
   let creator1Id: number;
   let creator2Id: number;
 
   beforeAll(async () => {
-    // Create test users
-    await upsertUser({ openId: "test-feed-user-1", name: "Feed Test User 1" });
-    await upsertUser({ openId: "test-feed-user-2", name: "Feed Test User 2" });
-    
-    // Get actual user IDs from database
-    const { getUserByOpenId } = await import("./db");
-    const user1 = await getUserByOpenId("test-feed-user-1");
-    const user2 = await getUserByOpenId("test-feed-user-2");
-    
-    if (!user1 || !user2) {
+    // Create test users with unique openIds
+    await upsertUser({ openId: `test-feed-user-1-${testRunId}`, name: "Feed Test User 1" });
+    await upsertUser({ openId: `test-feed-user-2-${testRunId}`, name: "Feed Test User 2" });
+    await upsertUser({ openId: `test-feed-user-3-${testRunId}`, name: "Feed Test User 3 (Empty)" });
+
+    const user1 = await getUserByOpenId(`test-feed-user-1-${testRunId}`);
+    const user2 = await getUserByOpenId(`test-feed-user-2-${testRunId}`);
+    const user3 = await getUserByOpenId(`test-feed-user-3-${testRunId}`);
+
+    if (!user1 || !user2 || !user3) {
       throw new Error("Failed to create test users");
     }
-    
+
     user1Id = user1.id;
     user2Id = user2.id;
+    user3Id = user3.id;
 
     // Create creators
     const creator1 = await createCreator({
       userId: user1Id,
-      username: `feedcreator1_${Date.now()}`,
+      username: `feedcreator1_${testRunId}`,
       displayName: "Feed Creator 1",
       bio: "Test creator 1",
     });
@@ -62,7 +66,7 @@ describe("Feed and Discover", () => {
 
     const creator2 = await createCreator({
       userId: user2Id,
-      username: `feedcreator2_${Date.now()}`,
+      username: `feedcreator2_${testRunId}`,
       displayName: "Feed Creator 2",
       bio: "Test creator 2",
     });
@@ -83,7 +87,8 @@ describe("Feed and Discover", () => {
   });
 
   it("should return empty feed when user follows no one", async () => {
-    const ctx = createAuthContext(user1Id, "test-feed-user-1");
+    // Use user3 who doesn't follow anyone
+    const ctx = createAuthContext(user3Id, `test-feed-user-3-${testRunId}`);
     const caller = appRouter.createCaller(ctx);
 
     const feed = await caller.feed.getFollowingPosts();
@@ -95,7 +100,7 @@ describe("Feed and Discover", () => {
     // User 1 follows Creator 2
     await followCreator(user1Id, creator2Id);
 
-    const ctx = createAuthContext(user1Id, "test-feed-user-1");
+    const ctx = createAuthContext(user1Id, `test-feed-user-1-${testRunId}`);
     const caller = appRouter.createCaller(ctx);
 
     const feed = await caller.feed.getFollowingPosts();
@@ -105,7 +110,7 @@ describe("Feed and Discover", () => {
   });
 
   it("should return all creators in discover", async () => {
-    const ctx = createAuthContext(user1Id, "test-feed-user-1");
+    const ctx = createAuthContext(user1Id, `test-feed-user-1-${testRunId}`);
     const caller = appRouter.createCaller(ctx);
 
     const creators = await caller.discover.getAllCreators({ limit: 50 });
@@ -114,10 +119,10 @@ describe("Feed and Discover", () => {
   });
 
   it("should search creators by username", async () => {
-    const ctx = createAuthContext(user1Id, "test-feed-user-1");
+    const ctx = createAuthContext(user1Id, `test-feed-user-1-${testRunId}`);
     const caller = appRouter.createCaller(ctx);
 
-    const results = await caller.discover.searchCreators({ query: "feedcreator1" });
+    const results = await caller.discover.searchCreators({ query: `feedcreator1_${testRunId}` });
 
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]?.displayName).toContain("Feed Creator 1");

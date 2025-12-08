@@ -15,5 +15,21 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    exclude: ["**/node_modules/**"],
+    setupFiles: ["./server/test/setup.ts"],
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    pool: "forks",
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      include: ["server/routers/**/*.ts", "server/lib/**/*.ts"],
+      exclude: ["**/*.test.ts", "**/*.spec.ts", "**/node_modules/**"],
+    },
   },
 });

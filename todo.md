@@ -102,6 +102,24 @@
 - [ ] コンテンツモデレーション
 - [ ] ユーザー管理
 
+### セキュリティ強化 (完了)
+- [x] 金額フィールドをintegerからbigintへ移行（drizzle/schema.ts）
+- [x] 金額入力に上限バリデーション追加（max: 10億円）
+- [x] レート制限導入（express-rate-limit）
+  - 一般API: 15分100リクエスト
+  - 決済系API: 1分10リクエスト
+- [x] 銀行口座情報の暗号化（AES-256-GCM）
+  - server/lib/crypto.ts 実装
+  - 口座番号を暗号化保存、表示時はマスク
+- [x] ファイルアップロードのマジックバイト検証追加
+- [x] CORS設定を明示的に追加（helmet.js + cors）
+- [x] 本番環境でのエラーメッセージ隠蔽
+  - tRPCエラーフォーマッター追加
+  - Stripe webhookエラーメッセージ隠蔽
+- [x] セキュリティヘッダー（helmet.js）導入
+  - Content-Security-Policy設定
+  - X-Content-Type-Options, X-Frame-Options等
+
 ---
 
 ## 技術的負債・改善項目
@@ -110,3 +128,9 @@
 - [ ] E2Eテスト追加
 - [ ] パフォーマンス最適化（画像遅延読み込み等）
 - [ ] アクセシビリティ対応
+
+## 運用上の注意
+
+### 必要な環境変数
+- `ENCRYPTION_KEY` - 銀行口座暗号化用（任意の32文字以上の文字列）
+- `ALLOWED_ORIGINS`（オプション）- カンマ区切りの許可オリジン

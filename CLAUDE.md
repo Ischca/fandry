@@ -73,6 +73,8 @@ server/               # Express + tRPC backend
 │   └── ...
 ├── stripe/
 │   └── webhook.ts    # Stripe webhook handler (all payment types)
+├── lib/
+│   └── crypto.ts     # Encryption utilities (AES-256-GCM)
 ├── db.ts             # Database query helpers
 └── _core/            # Framework internals
     ├── trpc.ts       # publicProcedure, protectedProcedure, adminProcedure
@@ -110,6 +112,15 @@ shared/               # Shared types and constants
 - **Non-Adult Content**: Points, Stripe direct, or hybrid (points + Stripe)
 - **Stripe Checkout**: Used for point purchases and direct payments
 - **Webhook**: `server/stripe/webhook.ts` handles all payment completions
+- **Amount Limits**: All amounts use `bigint` in DB, max 1 billion JPY validation
+
+**Security**:
+- **Rate Limiting**: `express-rate-limit` (100 req/15min general, 10 req/min for payments)
+- **CORS**: Explicit origin whitelist via `cors` middleware
+- **Security Headers**: `helmet.js` with CSP, X-Frame-Options, etc.
+- **Bank Account Encryption**: AES-256-GCM via `server/lib/crypto.ts`
+- **File Upload Validation**: Magic byte verification for MIME type validation
+- **Error Handling**: Production errors hide internal details (tRPC errorFormatter)
 
 **Path Aliases**:
 - `@/*` → `./client/src/*`
@@ -158,6 +169,8 @@ pnpm vitest run server/creator.test.ts
 
 **Optional**:
 - Cloudflare R2: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`
+- `ENCRYPTION_KEY` - For bank account encryption (32+ chars recommended)
+- `ALLOWED_ORIGINS` - Comma-separated CORS origins (defaults: localhost:3000, fndry.app, fandry.app)
 
 ## Deployment
 

@@ -181,6 +181,7 @@ pnpm vitest run server/creator.test.ts
 - `ALLOWED_ORIGINS` - Comma-separated CORS origins (defaults: localhost:3000, fndry.app, fandry.app)
 - `LOG_LEVEL` - Logging level: `debug`, `info`, `warn`, `error` (default: `info` in production, `debug` in dev)
 - `SERVICE_NAME` - Service name for log entries (default: `fandry-api`)
+- `TRUST_PROXY` - Express trust proxy setting (default: `1` in production, `0` in dev). **SECURITY**: Set to `0` if self-hosting without a reverse proxy. See: https://expressjs.com/en/guide/behind-proxies.html
 
 ## Deployment
 

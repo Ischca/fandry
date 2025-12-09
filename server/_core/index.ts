@@ -59,6 +59,15 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // Trust proxy - required for rate limiting behind reverse proxy
+  // SECURITY: Only enable when behind a trusted proxy (Railway, Heroku, AWS ELB, etc.)
+  // If self-hosting or exposing directly to internet, set TRUST_PROXY=0 or remove this
+  // See: https://expressjs.com/en/guide/behind-proxies.html
+  const trustProxy = process.env.TRUST_PROXY ?? (process.env.NODE_ENV === "production" ? "1" : "0");
+  if (trustProxy !== "0" && trustProxy !== "false") {
+    app.set("trust proxy", parseInt(trustProxy) || trustProxy);
+  }
+
   // Stripe webhook (must be before body parser to get raw body)
   app.use("/api/stripe/webhook", stripeWebhook);
 

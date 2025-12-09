@@ -49,6 +49,7 @@ export const postRouter = router({
       type: z.enum(["free", "paid", "membership"]),
       price: z.number().optional(),
       membershipTier: z.number().optional(),
+      backNumberPrice: z.number().optional(), // バックナンバー価格
       mediaUrls: z.string().optional(),
       previewMediaUrls: z.string().optional(), // プレビュー用メディアURL
       scheduledAt: z.string().datetime().optional(), // ISO8601形式
@@ -70,6 +71,7 @@ export const postRouter = router({
         type: input.type,
         price: input.price,
         membershipTier: input.membershipTier,
+        backNumberPrice: input.backNumberPrice,
         mediaUrls: input.mediaUrls,
         previewMediaUrls: input.previewMediaUrls,
         scheduledAt: scheduledAt,
@@ -106,6 +108,7 @@ export const postRouter = router({
       type: z.enum(["free", "paid", "membership"]).optional(),
       price: z.number().optional(),
       membershipTier: z.number().optional(),
+      backNumberPrice: z.number().optional().nullable(), // バックナンバー価格（nullで販売停止）
       mediaUrls: z.string().optional(),
       previewMediaUrls: z.string().optional().nullable(), // プレビュー用メディアURL
       scheduledAt: z.string().datetime().optional().nullable(), // nullで即時公開に変更

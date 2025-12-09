@@ -167,6 +167,7 @@ export async function getPostWithAccess(postId: number, userId?: number) {
       type: posts.type,
       price: posts.price,
       membershipTier: posts.membershipTier,
+      backNumberPrice: posts.backNumberPrice,
       mediaUrls: posts.mediaUrls,
       previewMediaUrls: posts.previewMediaUrls,
       scheduledAt: posts.scheduledAt,
@@ -179,6 +180,7 @@ export async function getPostWithAccess(postId: number, userId?: number) {
       creatorDisplayName: creators.displayName,
       creatorAvatarUrl: creators.avatarUrl,
       creatorUserId: creators.userId,
+      creatorIsAdult: creators.isAdult,
     })
     .from(posts)
     .leftJoin(creators, eq(posts.creatorId, creators.id))
@@ -243,6 +245,19 @@ export async function getPostWithAccess(postId: number, userId?: number) {
         isSubscribed = true;
         hasAccess = userTier >= requiredTier;
       }
+
+      // If no subscription access, check for back number purchase
+      if (!hasAccess) {
+        const purchase = await db
+          .select()
+          .from(purchases)
+          .where(and(eq(purchases.userId, userId), eq(purchases.postId, postId)))
+          .limit(1);
+        if (purchase.length > 0) {
+          isPurchased = true;
+          hasAccess = true;
+        }
+      }
     }
   }
 
@@ -250,6 +265,10 @@ export async function getPostWithAccess(postId: number, userId?: number) {
   const returnContent = hasAccess ? post.content : (post.previewContent || null);
   const returnMediaUrls = hasAccess ? post.mediaUrls : (post.previewMediaUrls || null);
   const hasPreview = !hasAccess && (!!post.previewContent || !!post.previewMediaUrls);
+
+  // Back number availability (membership posts with backNumberPrice set)
+  const canPurchaseBackNumber = !hasAccess && post.type === 'membership' && post.backNumberPrice !== null;
+  const isAdult = post.creatorIsAdult === 1;
 
   return {
     id: post.id,
@@ -259,6 +278,7 @@ export async function getPostWithAccess(postId: number, userId?: number) {
     type: post.type,
     price: post.price,
     membershipTier: post.membershipTier,
+    backNumberPrice: canPurchaseBackNumber ? post.backNumberPrice : null,
     mediaUrls: returnMediaUrls,
     scheduledAt: post.scheduledAt,
     publishedAt: post.publishedAt,
@@ -275,6 +295,8 @@ export async function getPostWithAccess(postId: number, userId?: number) {
     isScheduled,
     isCreator,
     hasPreview,
+    canPurchaseBackNumber,
+    isAdult,
   };
 }
 

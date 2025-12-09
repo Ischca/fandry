@@ -120,9 +120,12 @@ export const purchaseRouter = router({
       return { purchased: !!purchase };
     }),
 
-  // Get purchase options for a post
+  // Get purchase options for a post (paid or back number)
   getPurchaseOptions: protectedProcedure
-    .input(z.object({ postId: z.number() }))
+    .input(z.object({
+      postId: z.number(),
+      purchaseType: z.enum(["paid", "backNumber"]).optional().default("paid"),
+    }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       assertDb(db);
@@ -130,7 +133,9 @@ export const purchaseRouter = router({
       // Get post with creator info
       const [post] = await db.select({
         id: posts.id,
+        type: posts.type,
         price: posts.price,
+        backNumberPrice: posts.backNumberPrice,
         isAdult: posts.isAdult,
         creatorId: posts.creatorId,
         creatorIsAdult: creators.isAdult,
@@ -144,7 +149,26 @@ export const purchaseRouter = router({
 
       assertFound(post, "Post not found");
 
-      if (post.price === null || post.price === 0) {
+      // Determine price based on purchase type
+      let purchasePrice: number | null;
+      if (input.purchaseType === "backNumber") {
+        // Back number purchase for membership posts
+        if (post.type !== "membership") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "この投稿はバックナンバー購入できません" });
+        }
+        if (post.backNumberPrice === null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "この投稿はバックナンバー販売されていません" });
+        }
+        purchasePrice = post.backNumberPrice;
+      } else {
+        // Regular paid post purchase
+        if (post.type !== "paid") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "この投稿は購入できません" });
+        }
+        purchasePrice = post.price;
+      }
+
+      if (purchasePrice === null || purchasePrice === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "This post is free" });
       }
 
@@ -168,10 +192,12 @@ export const purchaseRouter = router({
         alreadyPurchased: false,
         post: {
           id: post.id,
-          price: post.price,
+          type: post.type,
+          price: purchasePrice,
           creatorUsername: post.creatorUsername,
           creatorDisplayName: post.creatorDisplayName,
         },
+        purchaseType: input.purchaseType,
         isAdult,
         userBalance,
         // Available payment methods based on content type
@@ -185,6 +211,7 @@ export const purchaseRouter = router({
   purchaseWithPoints: protectedProcedure
     .input(z.object({
       postId: z.number(),
+      purchaseType: z.enum(["paid", "backNumber"]).optional().default("paid"),
       idempotencyKey: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -194,7 +221,9 @@ export const purchaseRouter = router({
       // Get post
       const [post] = await db.select({
         id: posts.id,
+        type: posts.type,
         price: posts.price,
+        backNumberPrice: posts.backNumberPrice,
         isAdult: posts.isAdult,
         creatorId: posts.creatorId,
         title: posts.title,
@@ -205,8 +234,18 @@ export const purchaseRouter = router({
 
       assertFound(post, "Post not found");
 
-      if (post.price === null || post.price === 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This post is free" });
+      // Determine price based on purchase type
+      let purchasePrice: number;
+      if (input.purchaseType === "backNumber") {
+        if (post.type !== "membership" || post.backNumberPrice === null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "この投稿はバックナンバー購入できません" });
+        }
+        purchasePrice = post.backNumberPrice;
+      } else {
+        if (post.type !== "paid" || post.price === null || post.price === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This post is free" });
+        }
+        purchasePrice = post.price;
       }
 
       // Check if already purchased
@@ -223,20 +262,21 @@ export const purchaseRouter = router({
       }
 
       // Generate idempotency key
+      const operationType = input.purchaseType === "backNumber" ? "back_number_purchase_points" : "post_purchase_points";
       const idemKey = getOrGenerateIdempotencyKey(
         input.idempotencyKey,
-        "post_purchase_points",
+        operationType,
         ctx.user.id,
         input.postId
       );
 
       // Create audit log
       const auditLogId = await createAuditLog({
-        operationType: "post_purchase_points",
+        operationType,
         userId: ctx.user.id,
         creatorId: post.creatorId,
-        totalAmount: post.price,
-        pointsAmount: post.price,
+        totalAmount: purchasePrice,
+        pointsAmount: purchasePrice,
         idempotencyKey: idemKey,
       });
 
@@ -245,25 +285,26 @@ export const purchaseRouter = router({
         const [purchase] = await db.insert(purchases).values({
           userId: ctx.user.id,
           postId: input.postId,
-          amount: post.price,
+          amount: purchasePrice,
           paymentMethod: "points",
-          pointsUsed: post.price,
+          pointsUsed: purchasePrice,
           stripeAmount: 0,
           idempotencyKey: idemKey,
         }).returning();
 
         // Deduct points
+        const purchaseLabel = input.purchaseType === "backNumber" ? "バックナンバー購入" : "投稿購入";
         const newBalance = await deductPoints(
           db,
           ctx.user.id,
-          post.price,
+          purchasePrice,
           purchase.id,
-          `投稿購入: ${post.title || `Post #${post.id}`}`
+          `${purchaseLabel}: ${post.title || `Post #${post.id}`}`
         );
 
         // Update creator's total support
         await db.update(creators)
-          .set({ totalSupport: sql`${creators.totalSupport} + ${post.price}` })
+          .set({ totalSupport: sql`${creators.totalSupport} + ${purchasePrice}` })
           .where(eq(creators.id, post.creatorId));
 
         // Complete audit log
@@ -287,6 +328,7 @@ export const purchaseRouter = router({
   createStripeCheckout: protectedProcedure
     .input(z.object({
       postId: z.number(),
+      purchaseType: z.enum(["paid", "backNumber"]).optional().default("paid"),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
       idempotencyKey: z.string().optional(),
@@ -298,7 +340,9 @@ export const purchaseRouter = router({
       // Get post with creator info
       const [post] = await db.select({
         id: posts.id,
+        type: posts.type,
         price: posts.price,
+        backNumberPrice: posts.backNumberPrice,
         isAdult: posts.isAdult,
         creatorId: posts.creatorId,
         title: posts.title,
@@ -309,8 +353,28 @@ export const purchaseRouter = router({
 
       assertFound(post, "Post not found");
 
-      if (post.price === null || post.price === 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This post is free" });
+      // Determine price and operation type based on purchase type
+      let purchasePrice: number;
+      let operationType: "post_purchase_stripe" | "back_number_purchase_stripe";
+      let webhookType: string;
+      let purchaseLabel: string;
+
+      if (input.purchaseType === "backNumber") {
+        if (post.type !== "membership" || post.backNumberPrice === null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "この投稿はバックナンバー購入できません" });
+        }
+        purchasePrice = post.backNumberPrice;
+        operationType = "back_number_purchase_stripe";
+        webhookType = "back_number_purchase";
+        purchaseLabel = "バックナンバー購入";
+      } else {
+        if (post.type !== "paid" || post.price === null || post.price === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This post is free" });
+        }
+        purchasePrice = post.price;
+        operationType = "post_purchase_stripe";
+        webhookType = "post_purchase";
+        purchaseLabel = "コンテンツ購入";
       }
 
       // Check if adult content
@@ -338,18 +402,18 @@ export const purchaseRouter = router({
       // Generate idempotency key
       const idemKey = getOrGenerateIdempotencyKey(
         input.idempotencyKey,
-        "post_purchase_stripe",
+        operationType,
         ctx.user.id,
         input.postId
       );
 
       // Create audit log (pending state - will be completed by webhook)
       const auditLogId = await createAuditLog({
-        operationType: "post_purchase_stripe",
+        operationType,
         userId: ctx.user.id,
         creatorId: post.creatorId,
-        totalAmount: post.price,
-        stripeAmount: post.price,
+        totalAmount: purchasePrice,
+        stripeAmount: purchasePrice,
         idempotencyKey: idemKey,
       });
 
@@ -366,9 +430,9 @@ export const purchaseRouter = router({
                 currency: "jpy",
                 product_data: {
                   name: post.title || `Post #${post.id}`,
-                  description: "コンテンツ購入",
+                  description: purchaseLabel,
                 },
-                unit_amount: post.price,
+                unit_amount: purchasePrice,
               },
               quantity: 1,
             },
@@ -377,8 +441,8 @@ export const purchaseRouter = router({
             userId: ctx.user.id.toString(),
             postId: post.id.toString(),
             creatorId: post.creatorId.toString(),
-            type: "post_purchase",
-            amount: post.price.toString(),
+            type: webhookType,
+            amount: purchasePrice.toString(),
             auditLogId: auditLogId.toString(),
             idempotencyKey: idemKey,
           },
@@ -400,6 +464,7 @@ export const purchaseRouter = router({
   createHybridCheckout: protectedProcedure
     .input(z.object({
       postId: z.number(),
+      purchaseType: z.enum(["paid", "backNumber"]).optional().default("paid"),
       pointsToUse: z.number().min(0).max(1_000_000_000),
       successUrl: z.string().url(),
       cancelUrl: z.string().url(),
@@ -412,7 +477,9 @@ export const purchaseRouter = router({
       // Get post
       const [post] = await db.select({
         id: posts.id,
+        type: posts.type,
         price: posts.price,
+        backNumberPrice: posts.backNumberPrice,
         isAdult: posts.isAdult,
         creatorId: posts.creatorId,
         title: posts.title,
@@ -423,8 +490,25 @@ export const purchaseRouter = router({
 
       assertFound(post, "Post not found");
 
-      if (post.price === null || post.price === 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This post is free" });
+      // Determine price and labels based on purchase type
+      let purchasePrice: number;
+      let purchaseLabel: string;
+      let isBackNumber: boolean;
+
+      if (input.purchaseType === "backNumber") {
+        if (post.type !== "membership" || post.backNumberPrice === null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "この投稿はバックナンバー購入できません" });
+        }
+        purchasePrice = post.backNumberPrice;
+        purchaseLabel = "バックナンバー購入";
+        isBackNumber = true;
+      } else {
+        if (post.type !== "paid" || post.price === null || post.price === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This post is free" });
+        }
+        purchasePrice = post.price;
+        purchaseLabel = "投稿購入";
+        isBackNumber = false;
       }
 
       // Check if adult content
@@ -442,7 +526,7 @@ export const purchaseRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "ポイント残高が不足しています" });
       }
 
-      if (input.pointsToUse > post.price) {
+      if (input.pointsToUse > purchasePrice) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "使用ポイントが価格を超えています" });
       }
 
@@ -459,12 +543,19 @@ export const purchaseRouter = router({
         throw new TRPCError({ code: "CONFLICT", message: "Already purchased" });
       }
 
-      const stripeAmount = post.price - input.pointsToUse;
+      const stripeAmount = purchasePrice - input.pointsToUse;
+
+      // Determine operation types
+      const pointsOperationType = isBackNumber ? "back_number_purchase_points" : "post_purchase_points";
+      const hybridOperationType = isBackNumber ? "back_number_purchase_hybrid" : "post_purchase_hybrid";
+      const webhookType = isBackNumber
+        ? (stripeAmount === 0 ? "back_number_purchase" : "back_number_purchase_hybrid")
+        : (stripeAmount === 0 ? "post_purchase" : "post_purchase_hybrid");
 
       // Generate idempotency key
       const idemKey = getOrGenerateIdempotencyKey(
         input.idempotencyKey,
-        stripeAmount === 0 ? "post_purchase_points" : "post_purchase_hybrid",
+        stripeAmount === 0 ? pointsOperationType : hybridOperationType,
         ctx.user.id,
         input.postId
       );
@@ -472,11 +563,11 @@ export const purchaseRouter = router({
       // If all points cover the price, just do points purchase
       if (stripeAmount === 0) {
         const auditLogId = await createAuditLog({
-          operationType: "post_purchase_points",
+          operationType: pointsOperationType,
           userId: ctx.user.id,
           creatorId: post.creatorId,
-          totalAmount: post.price,
-          pointsAmount: post.price,
+          totalAmount: purchasePrice,
+          pointsAmount: purchasePrice,
           idempotencyKey: idemKey,
         });
 
@@ -485,9 +576,9 @@ export const purchaseRouter = router({
           const [purchase] = await db.insert(purchases).values({
             userId: ctx.user.id,
             postId: input.postId,
-            amount: post.price,
+            amount: purchasePrice,
             paymentMethod: "points",
-            pointsUsed: post.price,
+            pointsUsed: purchasePrice,
             stripeAmount: 0,
             idempotencyKey: idemKey,
           }).returning();
@@ -496,14 +587,14 @@ export const purchaseRouter = router({
           const newBalance = await deductPoints(
             db,
             ctx.user.id,
-            post.price,
+            purchasePrice,
             purchase.id,
-            `投稿購入: ${post.title || `Post #${post.id}`}`
+            `${purchaseLabel}: ${post.title || `Post #${post.id}`}`
           );
 
           // Update creator's total support
           await db.update(creators)
-            .set({ totalSupport: sql`${creators.totalSupport} + ${post.price}` })
+            .set({ totalSupport: sql`${creators.totalSupport} + ${purchasePrice}` })
             .where(eq(creators.id, post.creatorId));
 
           await completeAuditLog(auditLogId, {
@@ -523,10 +614,10 @@ export const purchaseRouter = router({
 
       // Create audit log for hybrid purchase
       const auditLogId = await createAuditLog({
-        operationType: "post_purchase_hybrid",
+        operationType: hybridOperationType,
         userId: ctx.user.id,
         creatorId: post.creatorId,
-        totalAmount: post.price,
+        totalAmount: purchasePrice,
         pointsAmount: input.pointsToUse,
         stripeAmount: stripeAmount,
         idempotencyKey: idemKey,
@@ -545,7 +636,7 @@ export const purchaseRouter = router({
                 currency: "jpy",
                 product_data: {
                   name: post.title || `Post #${post.id}`,
-                  description: `コンテンツ購入（${input.pointsToUse}pt割引適用）`,
+                  description: `${purchaseLabel}（${input.pointsToUse}pt割引適用）`,
                 },
                 unit_amount: stripeAmount,
               },
@@ -556,8 +647,8 @@ export const purchaseRouter = router({
             userId: ctx.user.id.toString(),
             postId: post.id.toString(),
             creatorId: post.creatorId.toString(),
-            type: "post_purchase_hybrid",
-            totalAmount: post.price.toString(),
+            type: webhookType,
+            totalAmount: purchasePrice.toString(),
             pointsUsed: input.pointsToUse.toString(),
             stripeAmount: stripeAmount.toString(),
             auditLogId: auditLogId.toString(),

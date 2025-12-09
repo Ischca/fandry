@@ -95,6 +95,7 @@ export const posts = pgTable("posts", {
   type: postTypeEnum("type").default("free").notNull(),
   price: bigint("price", { mode: "number" }).default(0), // 価格（円）
   membershipTier: integer("membership_tier").default(0), // 必要な会員ランク
+  backNumberPrice: bigint("back_number_price", { mode: "number" }), // バックナンバー価格（nullなら販売不可）
   mediaUrls: text("media_urls"), // JSON array of URLs
   previewMediaUrls: text("preview_media_urls"), // プレビュー用メディアURL（JSON array）
   isAdult: integer("is_adult").default(0).notNull(), // アダルトコンテンツ
@@ -464,6 +465,10 @@ export const auditOperationTypeEnum = pgEnum("audit_operation_type", [
   "post_purchase_points",  // ポイントでの投稿購入
   "post_purchase_stripe",  // Stripeでの投稿購入
   "post_purchase_hybrid",  // ハイブリッド投稿購入
+  // バックナンバー購入関連
+  "back_number_purchase_points",  // ポイントでのバックナンバー購入
+  "back_number_purchase_stripe",  // Stripeでのバックナンバー購入
+  "back_number_purchase_hybrid",  // ハイブリッドバックナンバー購入
   // サブスクリプション関連
   "subscription_points",   // ポイントでのサブスク開始
   "subscription_stripe",   // Stripeでのサブスク開始

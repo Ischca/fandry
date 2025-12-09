@@ -481,8 +481,8 @@ router.post(
           }
         }
 
-        // Handle direct post purchase
-        else if (type === "post_purchase") {
+        // Handle direct post purchase (including back number)
+        else if (type === "post_purchase" || type === "back_number_purchase") {
           const userId = parseInt(session.metadata?.userId || "0");
           const postId = parseInt(session.metadata?.postId || "0");
           const amount = parseInt(session.metadata?.amount || "0");
@@ -503,19 +503,19 @@ router.post(
                 });
               }
             } else {
-              console.error(`Failed to complete post purchase for session ${session.id}`);
+              console.error(`Failed to complete ${type} for session ${session.id}`);
               if (auditLogId) {
                 await failAuditLog(auditLogId, {
                   code: "WEBHOOK_PROCESSING_FAILED",
-                  message: "Failed to complete post purchase after successful payment",
+                  message: `Failed to complete ${type} after successful payment`,
                 }, true);
               }
             }
           }
         }
 
-        // Handle hybrid post purchase
-        else if (type === "post_purchase_hybrid") {
+        // Handle hybrid post purchase (including back number hybrid)
+        else if (type === "post_purchase_hybrid" || type === "back_number_purchase_hybrid") {
           const userId = parseInt(session.metadata?.userId || "0");
           const postId = parseInt(session.metadata?.postId || "0");
           const totalAmount = parseInt(session.metadata?.totalAmount || "0");
@@ -540,12 +540,12 @@ router.post(
                 });
               }
             } else {
-              console.error(`Failed to complete hybrid purchase for session ${session.id}`);
+              console.error(`Failed to complete ${type} for session ${session.id}`);
               // This is critical - points may have been deducted but purchase not recorded
               if (auditLogId) {
                 await failAuditLog(auditLogId, {
                   code: "WEBHOOK_PROCESSING_FAILED",
-                  message: "Failed to complete hybrid purchase - points may need recovery",
+                  message: `Failed to complete ${type} - points may need recovery`,
                   details: { userId, postId, pointsUsed, stripeAmount },
                 }, true);
               }

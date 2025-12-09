@@ -77,12 +77,21 @@ async function startServer() {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            "https://js.stripe.com",
+            "https://*.clerk.accounts.dev",
+            "https://*.clerk.com",
+            "https://static.cloudflareinsights.com",
+          ],
           styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
           imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
-          frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
+          frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
           connectSrc: ["'self'", "https://api.stripe.com", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
+          workerSrc: ["'self'", "blob:"],
         },
       },
       crossOriginEmbedderPolicy: false, // Allow loading external resources

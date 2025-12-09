@@ -29,6 +29,9 @@ export async function setupVite(app: Express, server: Server) {
       const pageContext = await renderPage({
         urlOriginal: req.originalUrl,
         headersOriginal: req.headers,
+        // Express req/res をVikeに渡す（SSR認証用）
+        expressRequest: req,
+        expressResponse: res,
       });
       const { httpResponse } = pageContext;
 
@@ -70,6 +73,9 @@ export async function serveStatic(app: Express) {
       const pageContext = await renderPage({
         urlOriginal: req.originalUrl,
         headersOriginal: req.headers,
+        // Express req/res をVikeに渡す（SSR認証用）
+        expressRequest: req,
+        expressResponse: res,
       });
       const { httpResponse } = pageContext;
 

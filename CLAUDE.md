@@ -74,7 +74,9 @@ server/               # Express + tRPC backend
 ├── stripe/
 │   └── webhook.ts    # Stripe webhook handler (all payment types)
 ├── lib/
-│   └── crypto.ts     # Encryption utilities (AES-256-GCM)
+│   ├── crypto.ts     # Encryption utilities (AES-256-GCM)
+│   ├── logger.ts     # Structured logging (Railway-compatible JSON)
+│   └── auditLogger.ts # Payment audit trail
 ├── db.ts             # Database query helpers
 └── _core/            # Framework internals
     ├── trpc.ts       # publicProcedure, protectedProcedure, adminProcedure
@@ -121,6 +123,12 @@ shared/               # Shared types and constants
 - **Bank Account Encryption**: AES-256-GCM via `server/lib/crypto.ts`
 - **File Upload Validation**: Magic byte verification for MIME type validation
 - **Error Handling**: Production errors hide internal details (tRPC errorFormatter)
+
+**Logging**:
+- **Structured Logger**: `server/lib/logger.ts` outputs Railway-compatible JSON logs
+- **Log Levels**: `debug`, `info`, `warn`, `error` (configurable via `LOG_LEVEL` env)
+- **Usage**: `import { logger } from './lib/logger'; logger.info("message", { userId, amount })`
+- **Railway Search**: Filter logs by `@operationType:post_purchase`, `@userId:123`, `@level:error`
 
 **Path Aliases**:
 - `@/*` → `./client/src/*`
@@ -171,6 +179,8 @@ pnpm vitest run server/creator.test.ts
 - Cloudflare R2: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`
 - `ENCRYPTION_KEY` - For bank account encryption (32+ chars recommended)
 - `ALLOWED_ORIGINS` - Comma-separated CORS origins (defaults: localhost:3000, fndry.app, fandry.app)
+- `LOG_LEVEL` - Logging level: `debug`, `info`, `warn`, `error` (default: `info` in production, `debug` in dev)
+- `SERVICE_NAME` - Service name for log entries (default: `fandry-api`)
 
 ## Deployment
 

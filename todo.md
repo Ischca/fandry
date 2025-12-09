@@ -91,6 +91,7 @@
   - [x] postsテーブルにbackNumberPrice追加
   - [x] 投稿作成/更新APIでバックナンバー価格設定可能
   - [x] 購入API（purchaseWithPoints）でバックナンバー購入対応
+  - [x] Stripe/ハイブリッド決済でバックナンバー購入対応
   - [x] getPostWithAccessでバックナンバー購入済みチェック
   - [x] canPurchaseBackNumber/backNumberPriceを返却
 
@@ -103,6 +104,9 @@
 - [x] Cloudflare R2ストレージ統合（server/upload.ts実装済み）
 - [x] ポイント自動更新（サブスク月次課金）用のcronジョブ（server/cron/processSubscriptions.ts）
 - [x] 7日間猶予期間ロジック（残高不足時、cronジョブ内に実装）
+- [x] 構造化ロギング（Railway対応）
+  - [x] server/lib/logger.ts 実装（JSON形式、ログレベル、子ロガー）
+  - [x] webhook、cronジョブ、DBヘルパーを構造化ログ対応
 
 ### 収益化機能
 - [x] クリエイター向け収益ダッシュボード

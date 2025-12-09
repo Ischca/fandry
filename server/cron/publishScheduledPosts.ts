@@ -17,18 +17,19 @@ import {
   notifications,
   users,
 } from "../../drizzle/schema";
+import { logger } from "../lib/logger";
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    console.error("DATABASE_URL not set");
+    logger.error("DATABASE_URL not set");
     process.exit(1);
   }
 
   const client = neon(databaseUrl);
   const db = drizzle(client);
 
-  console.log(`[${new Date().toISOString()}] Starting scheduled post publication...`);
+  logger.info("Starting scheduled post publication");
 
   const now = new Date();
 
@@ -53,7 +54,7 @@ async function main() {
       )
     );
 
-  console.log(`Found ${scheduledPosts.length} posts to publish`);
+  logger.info("Found posts to publish", { count: scheduledPosts.length });
 
   for (const post of scheduledPosts) {
     try {
@@ -66,7 +67,11 @@ async function main() {
         })
         .where(eq(posts.id, post.id));
 
-      console.log(`Published post ${post.id}: "${post.title || post.content.slice(0, 30)}..."`);
+      logger.info("Published scheduled post", {
+        postId: post.id,
+        creatorId: post.creatorId,
+        title: post.title || post.content.slice(0, 30),
+      });
 
       // Get all followers of this creator
       const followerIds = await db
@@ -88,14 +93,26 @@ async function main() {
         }));
 
         await db.insert(notifications).values(notificationValues);
-        console.log(`Sent ${followerIds.length} notifications for post ${post.id}`);
+        logger.info("Sent notifications for new post", {
+          postId: post.id,
+          notificationCount: followerIds.length,
+        });
       }
     } catch (error) {
-      console.error(`Failed to publish post ${post.id}:`, error);
+      logger.error("Failed to publish scheduled post", {
+        postId: post.id,
+        creatorId: post.creatorId,
+        error,
+      });
     }
   }
 
-  console.log(`[${new Date().toISOString()}] Scheduled post publication complete`);
+  logger.info("Scheduled post publication complete", {
+    publishedCount: scheduledPosts.length,
+  });
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  logger.error("Fatal error in scheduled post cron", { error: err });
+  process.exit(1);
+});

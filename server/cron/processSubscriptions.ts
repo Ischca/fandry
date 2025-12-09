@@ -17,20 +17,21 @@ import {
   pointTransactions,
   creators,
 } from "../../drizzle/schema";
+import { logger } from "../lib/logger";
 
 const GRACE_PERIOD_DAYS = 7;
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    console.error("DATABASE_URL not set");
+    logger.error("DATABASE_URL not set");
     process.exit(1);
   }
 
   const client = neon(databaseUrl);
   const db = drizzle(client);
 
-  console.log(`[${new Date().toISOString()}] Starting subscription renewal process...`);
+  logger.info("Starting subscription renewal process");
 
   // Find all active point-based subscriptions that are due for renewal
   const now = new Date();
@@ -55,7 +56,9 @@ async function main() {
       )
     );
 
-  console.log(`Found ${dueSubscriptions.length} subscriptions due for renewal`);
+  logger.info("Found subscriptions due for renewal", {
+    count: dueSubscriptions.length,
+  });
 
   let renewed = 0;
   let failed = 0;
@@ -64,7 +67,10 @@ async function main() {
 
   for (const sub of dueSubscriptions) {
     if (!sub.planPrice || !sub.creatorId) {
-      console.log(`Subscription ${sub.id}: Invalid plan data, skipping`);
+      logger.warn("Invalid plan data for subscription", {
+        transactionId: sub.id,
+        planId: sub.planId,
+      });
       continue;
     }
 
@@ -121,7 +127,13 @@ async function main() {
           .set({ totalSupport: sql`${creators.totalSupport} + ${sub.planPrice}` })
           .where(eq(creators.id, sub.creatorId));
 
-        console.log(`Subscription ${sub.id}: Renewed successfully (user ${sub.userId})`);
+        logger.info("Subscription renewed successfully", {
+          transactionId: sub.id,
+          userId: sub.userId,
+          planId: sub.planId,
+          amount: sub.planPrice,
+          operationType: "subscription_renewal",
+        });
         renewed++;
       } else {
         // Insufficient balance - check grace period
@@ -147,14 +159,19 @@ async function main() {
               .set({ subscriberCount: sql`${subscriptionPlans.subscriberCount} - 1` })
               .where(eq(subscriptionPlans.id, sub.planId));
 
-            console.log(
-              `Subscription ${sub.id}: Cancelled due to insufficient balance after grace period`
-            );
+            logger.warn("Subscription cancelled due to insufficient balance after grace period", {
+              transactionId: sub.id,
+              userId: sub.userId,
+              planId: sub.planId,
+              operationType: "subscription_cancel",
+            });
             cancelled++;
           } else {
-            console.log(
-              `Subscription ${sub.id}: Still in grace period until ${graceEndDate.toISOString()}`
-            );
+            logger.info("Subscription still in grace period", {
+              transactionId: sub.id,
+              userId: sub.userId,
+              graceEndDate: graceEndDate.toISOString(),
+            });
             gracePeriod++;
           }
         } else {
@@ -170,31 +187,38 @@ async function main() {
           const graceEndDate = new Date();
           graceEndDate.setDate(graceEndDate.getDate() + GRACE_PERIOD_DAYS);
 
-          console.log(
-            `Subscription ${sub.id}: Insufficient balance (${balance}/${sub.planPrice}), grace period started until ${graceEndDate.toISOString()}`
-          );
+          logger.warn("Subscription grace period started due to insufficient balance", {
+            transactionId: sub.id,
+            userId: sub.userId,
+            currentBalance: balance,
+            requiredAmount: sub.planPrice,
+            graceEndDate: graceEndDate.toISOString(),
+          });
           gracePeriod++;
         }
         failed++;
       }
     } catch (error) {
-      console.error(`Subscription ${sub.id}: Error processing -`, error);
+      logger.error("Error processing subscription renewal", {
+        transactionId: sub.id,
+        userId: sub.userId,
+        error,
+      });
       failed++;
     }
   }
 
-  console.log(`
-[${new Date().toISOString()}] Subscription renewal complete:
-  - Renewed: ${renewed}
-  - Failed (insufficient balance): ${failed}
-  - In grace period: ${gracePeriod}
-  - Cancelled: ${cancelled}
-  `);
+  logger.info("Subscription renewal process complete", {
+    renewed,
+    failed,
+    gracePeriod,
+    cancelled,
+  });
 
   process.exit(0);
 }
 
 main().catch((err) => {
-  console.error("Fatal error:", err);
+  logger.error("Fatal error in subscription cron", { error: err });
   process.exit(1);
 });

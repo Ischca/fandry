@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
+import { logger } from "./lib/logger";
 
 // Cloudflare R2 configuration
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
@@ -193,7 +194,7 @@ export async function generatePresignedUploadUrl(
 
     return { url, key, publicUrl };
   } catch (error) {
-    console.error("Failed to generate presigned URL:", error);
+    logger.error("Failed to generate presigned URL", { error });
     return { error: "Failed to generate upload URL" };
   }
 }
@@ -214,7 +215,7 @@ export async function deleteFile(key: string): Promise<{ success: boolean; error
     await client.send(command);
     return { success: true };
   } catch (error) {
-    console.error("Failed to delete file:", error);
+    logger.error("Failed to delete file", { error });
     return { success: false, error: "Failed to delete file" };
   }
 }

@@ -20,6 +20,7 @@ import {
   markForRecovery,
 } from "../lib/auditLogger";
 import { createNotification } from "../routers/notification";
+import { logger, createPaymentLogger } from "../lib/logger";
 
 const router = Router();
 
@@ -86,10 +87,21 @@ async function creditPoints(
       stripePaymentIntentId,
     });
 
-    console.log(`Credited ${amount} points to user ${userId}. New balance: ${newBalance}`);
+    logger.info("Points credited successfully", {
+      userId,
+      amount,
+      pointsAmount: newBalance,
+      operationType: "point_purchase",
+      stripePaymentIntentId,
+    });
     return true;
   } catch (error) {
-    console.error("Failed to credit points:", error);
+    logger.error("Failed to credit points", {
+      userId,
+      amount,
+      operationType: "point_purchase",
+      error,
+    });
     return false;
   }
 }
@@ -112,7 +124,7 @@ async function completePostPurchase(
       .limit(1);
 
     if (!post) {
-      console.error(`Post ${postId} not found`);
+      logger.error("Post not found for purchase", { postId, userId });
       return false;
     }
 
@@ -132,10 +144,23 @@ async function completePostPurchase(
       .set({ totalSupport: sql`${creators.totalSupport} + ${amount}` })
       .where(eq(creators.id, post.creatorId));
 
-    console.log(`Post purchase completed: User ${userId} purchased post ${postId} for ${amount} JPY`);
+    logger.info("Post purchase completed", {
+      userId,
+      postId,
+      amount,
+      creatorId: post.creatorId,
+      operationType: "post_purchase_stripe",
+      stripePaymentIntentId,
+    });
     return true;
   } catch (error) {
-    console.error("Failed to complete post purchase:", error);
+    logger.error("Failed to complete post purchase", {
+      userId,
+      postId,
+      amount,
+      operationType: "post_purchase_stripe",
+      error,
+    });
     return false;
   }
 }
@@ -160,7 +185,7 @@ async function completeHybridPurchase(
       .limit(1);
 
     if (!post) {
-      console.error(`Post ${postId} not found`);
+      logger.error("Post not found for hybrid purchase", { postId, userId });
       return false;
     }
 
@@ -171,7 +196,12 @@ async function completeHybridPurchase(
       .limit(1);
 
     if (!points || points.balance < pointsUsed) {
-      console.error(`User ${userId} has insufficient points for hybrid purchase`);
+      logger.error("Insufficient points for hybrid purchase", {
+        userId,
+        postId,
+        pointsUsed,
+        currentBalance: points?.balance ?? 0,
+      });
       return false;
     }
 
@@ -211,10 +241,27 @@ async function completeHybridPurchase(
       .set({ totalSupport: sql`${creators.totalSupport} + ${totalAmount}` })
       .where(eq(creators.id, post.creatorId));
 
-    console.log(`Hybrid purchase completed: User ${userId} purchased post ${postId} for ${totalAmount} JPY (${pointsUsed} pt + ${stripeAmount} Stripe)`);
+    logger.info("Hybrid purchase completed", {
+      userId,
+      postId,
+      amount: totalAmount,
+      pointsAmount: pointsUsed,
+      stripeAmount,
+      creatorId: post.creatorId,
+      operationType: "post_purchase_hybrid",
+      stripePaymentIntentId,
+    });
     return true;
   } catch (error) {
-    console.error("Failed to complete hybrid purchase:", error);
+    logger.error("Failed to complete hybrid purchase", {
+      userId,
+      postId,
+      amount: totalAmount,
+      pointsAmount: pointsUsed,
+      stripeAmount,
+      operationType: "post_purchase_hybrid",
+      error,
+    });
     return false;
   }
 }
@@ -236,7 +283,7 @@ async function completeStripeSubscription(
       .limit(1);
 
     if (!plan) {
-      console.error(`Plan ${planId} not found`);
+      logger.error("Plan not found for subscription", { planId, userId });
       return false;
     }
 
@@ -285,10 +332,23 @@ async function completeStripeSubscription(
       });
     }
 
-    console.log(`Stripe subscription completed: User ${userId} subscribed to plan ${planId}`);
+    logger.info("Stripe subscription completed", {
+      userId,
+      planId,
+      creatorId: plan.creatorId,
+      amount: plan.price,
+      operationType: "subscription_stripe",
+      stripeSubscriptionId,
+    });
     return true;
   } catch (error) {
-    console.error("Failed to complete Stripe subscription:", error);
+    logger.error("Failed to complete Stripe subscription", {
+      userId,
+      planId,
+      operationType: "subscription_stripe",
+      stripeSubscriptionId,
+      error,
+    });
     return false;
   }
 }
@@ -323,10 +383,22 @@ async function completeTip(
       .set({ totalSupport: sql`${creators.totalSupport} + ${amount}` })
       .where(eq(creators.id, creatorId));
 
-    console.log(`Tip completed: User ${userId} tipped ${amount} JPY to creator ${creatorId}`);
+    logger.info("Tip completed", {
+      userId,
+      creatorId,
+      amount,
+      operationType: "tip_stripe",
+      stripePaymentIntentId,
+    });
     return true;
   } catch (error) {
-    console.error("Failed to complete tip:", error);
+    logger.error("Failed to complete tip", {
+      userId,
+      creatorId,
+      amount,
+      operationType: "tip_stripe",
+      error,
+    });
     return false;
   }
 }
@@ -352,7 +424,12 @@ async function completeHybridTip(
       .limit(1);
 
     if (!points || points.balance < pointsUsed) {
-      console.error(`User ${userId} has insufficient points for hybrid tip`);
+      logger.error("Insufficient points for hybrid tip", {
+        userId,
+        creatorId,
+        pointsUsed,
+        currentBalance: points?.balance ?? 0,
+      });
       return false;
     }
 
@@ -394,10 +471,26 @@ async function completeHybridTip(
       .set({ totalSupport: sql`${creators.totalSupport} + ${totalAmount}` })
       .where(eq(creators.id, creatorId));
 
-    console.log(`Hybrid tip completed: User ${userId} tipped ${totalAmount} JPY (${pointsUsed} pt + ${stripeAmount} Stripe) to creator ${creatorId}`);
+    logger.info("Hybrid tip completed", {
+      userId,
+      creatorId,
+      amount: totalAmount,
+      pointsAmount: pointsUsed,
+      stripeAmount,
+      operationType: "tip_hybrid",
+      stripePaymentIntentId,
+    });
     return true;
   } catch (error) {
-    console.error("Failed to complete hybrid tip:", error);
+    logger.error("Failed to complete hybrid tip", {
+      userId,
+      creatorId,
+      amount: totalAmount,
+      pointsAmount: pointsUsed,
+      stripeAmount,
+      operationType: "tip_hybrid",
+      error,
+    });
     return false;
   }
 }
@@ -409,13 +502,13 @@ router.post(
   async (req, res) => {
     const stripe = getStripe();
     if (!stripe) {
-      console.error("Stripe not configured");
+      logger.error("Stripe not configured");
       return res.status(500).send("Stripe not configured");
     }
 
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) {
-      console.error("Webhook secret not configured");
+      logger.error("Webhook secret not configured");
       return res.status(500).send("Webhook secret not configured");
     }
 
@@ -429,7 +522,7 @@ router.post(
     try {
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err) {
-      console.error("Webhook signature verification failed:", err);
+      logger.error("Webhook signature verification failed", { error: err });
       // Don't expose internal error details in production
       const errorMessage = process.env.NODE_ENV === "production"
         ? "Webhook verification failed"
@@ -469,7 +562,12 @@ router.post(
                 });
               }
             } else {
-              console.error(`Failed to credit points for session ${session.id}`);
+              logger.error("Failed to credit points via webhook", {
+                stripeSessionId: session.id,
+                userId,
+                pointsAmount: points,
+                operationType: "point_purchase",
+              });
               // Mark for recovery
               if (auditLogId) {
                 await failAuditLog(auditLogId, {
@@ -503,7 +601,13 @@ router.post(
                 });
               }
             } else {
-              console.error(`Failed to complete ${type} for session ${session.id}`);
+              logger.error("Failed to complete post purchase via webhook", {
+                stripeSessionId: session.id,
+                userId,
+                postId,
+                amount,
+                operationType: type,
+              });
               if (auditLogId) {
                 await failAuditLog(auditLogId, {
                   code: "WEBHOOK_PROCESSING_FAILED",
@@ -540,7 +644,15 @@ router.post(
                 });
               }
             } else {
-              console.error(`Failed to complete ${type} for session ${session.id}`);
+              logger.error("Failed to complete hybrid purchase via webhook", {
+                stripeSessionId: session.id,
+                userId,
+                postId,
+                amount: totalAmount,
+                pointsAmount: pointsUsed,
+                stripeAmount,
+                operationType: type,
+              });
               // This is critical - points may have been deducted but purchase not recorded
               if (auditLogId) {
                 await failAuditLog(auditLogId, {
@@ -568,7 +680,12 @@ router.post(
               subscriptionId
             );
             if (!success) {
-              console.error(`Failed to complete subscription for session ${session.id}`);
+              logger.error("Failed to complete subscription via webhook", {
+                stripeSessionId: session.id,
+                userId,
+                planId,
+                operationType: "subscription_stripe",
+              });
             }
           }
         }
@@ -597,7 +714,13 @@ router.post(
                 });
               }
             } else {
-              console.error(`Failed to complete tip for session ${session.id}`);
+              logger.error("Failed to complete tip via webhook", {
+                stripeSessionId: session.id,
+                userId,
+                creatorId,
+                amount,
+                operationType: "tip_stripe",
+              });
               if (auditLogId) {
                 await failAuditLog(auditLogId, {
                   code: "WEBHOOK_PROCESSING_FAILED",
@@ -636,7 +759,15 @@ router.post(
                 });
               }
             } else {
-              console.error(`Failed to complete hybrid tip for session ${session.id}`);
+              logger.error("Failed to complete hybrid tip via webhook", {
+                stripeSessionId: session.id,
+                userId,
+                creatorId,
+                amount: totalAmount,
+                pointsAmount: pointsUsed,
+                stripeAmount,
+                operationType: "tip_hybrid",
+              });
               if (auditLogId) {
                 await failAuditLog(auditLogId, {
                   code: "WEBHOOK_PROCESSING_FAILED",
@@ -653,13 +784,15 @@ router.post(
 
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        console.log(`PaymentIntent ${paymentIntent.id} succeeded`);
+        logger.debug("PaymentIntent succeeded", {
+          stripePaymentIntentId: paymentIntent.id,
+        });
         // Handle direct payment success if needed
         break;
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logger.debug("Unhandled webhook event type", { eventType: event.type });
     }
 
     res.json({ received: true });

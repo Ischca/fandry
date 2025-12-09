@@ -28,8 +28,8 @@ pnpm test             # Run all tests with vitest
 pnpm db:push          # Generate and run migrations (drizzle-kit generate && drizzle-kit migrate)
 
 # Production
-pnpm build            # Build for production (vite + esbuild)
-pnpm start            # Run production server
+pnpm build            # Build for production (vite build - client + SSR bundles)
+pnpm start            # Run production server (tsx - SSR enabled)
 ```
 
 ## Architecture
@@ -37,9 +37,16 @@ pnpm start            # Run production server
 ### Full-Stack TypeScript Monorepo
 
 ```
-client/               # React frontend (Vite)
+client/               # React frontend (Vite + Vike SSR)
+├── pages/            # Vike file-based routing (SSR enabled)
+│   ├── +config.ts    # Global Vike config (ssr: true)
+│   ├── +Layout.tsx   # Root layout component
+│   ├── +Wrapper.tsx  # Providers (Clerk, tRPC, QueryClient)
+│   ├── index/+Page.tsx       # Home page
+│   ├── creator/@username/    # Dynamic creator pages
+│   ├── post/@id/             # Dynamic post pages
+│   └── ...
 ├── src/
-│   ├── pages/        # Route components (Home, CreatorPage, Feed, etc.)
 │   ├── components/   # Shared UI (shadcn/ui based)
 │   │   ├── Header.tsx           # Shared site header (nav, search, user menu)
 │   │   ├── PostCard.tsx         # Post card with like/comment actions
@@ -81,6 +88,7 @@ server/               # Express + tRPC backend
 └── _core/            # Framework internals
     ├── trpc.ts       # publicProcedure, protectedProcedure, adminProcedure
     ├── context.ts    # Request context with Clerk auth
+    ├── vite.ts       # Vike SSR middleware (dev + production)
     └── index.ts      # Express server setup
 
 drizzle/
@@ -134,8 +142,15 @@ shared/               # Shared types and constants
 - `@/*` → `./client/src/*`
 - `@shared/*` → `./shared/*`
 
-**SEO**: Comprehensive meta tags in `client/index.html`:
+**SSR (Vike)**:
+- File-based routing in `client/pages/` with `+Page.tsx`, `+config.ts`, etc.
+- SSR enabled by default (`ssr: true` in `client/pages/+config.ts`)
+- Production uses `tsx` to run server directly (no esbuild bundling)
+- Build outputs: `dist/public/client/` (assets) + `dist/public/server/` (SSR bundle)
+
+**SEO**: Comprehensive meta tags via Vike's `+Head.tsx`:
 - OGP, Twitter Card, JSON-LD structured data
+- Dynamic meta tags for creator/post pages
 - Favicon/OG images use "Warm Celebration" theme (coral `#E05A3A`)
 - Run `node scripts/generate-images.mjs` to regenerate PNGs from SVGs
 

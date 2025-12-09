@@ -2,7 +2,7 @@ import type { Config } from "vike/types";
 import vikeReact from "vike-react/config";
 
 export default {
-  // SSRを有効化（個別ページでssr: falseで上書き可能）
+  // SSRを有効化
   ssr: true,
 
   // プリレンダリングは無効

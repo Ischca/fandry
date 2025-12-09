@@ -16,6 +16,8 @@ import {
   assertDb,
   assertFound,
 } from "./_shared";
+import { getCreatorById } from "../db";
+import { createNotification } from "./notification";
 import Stripe from "stripe";
 
 // Stripe client (lazy initialization)
@@ -194,7 +196,18 @@ export const subscriptionRouter = router({
       }
 
       const isAdult = plan.isAdult === 1 || plan.creatorIsAdult === 1;
+      const isFree = plan.price === 0;
       const userBalance = await getUserBalance(db, ctx.user.id);
+
+      // Free plans only need "free" as payment method
+      let paymentMethods: string[];
+      if (isFree) {
+        paymentMethods = ["free"];
+      } else if (isAdult) {
+        paymentMethods = ["points"];
+      } else {
+        paymentMethods = ["points", "stripe"];
+      }
 
       return {
         alreadySubscribed: false,
@@ -207,14 +220,13 @@ export const subscriptionRouter = router({
           creatorDisplayName: plan.creatorDisplayName,
         },
         isAdult,
+        isFree,
         userBalance,
-        paymentMethods: isAdult
-          ? ["points"]
-          : ["points", "stripe"],
+        paymentMethods,
       };
     }),
 
-  // Subscribe with points (for adult content or by choice)
+  // Subscribe with points (for adult content or by choice) - also handles free plans
   subscribeWithPoints: protectedProcedure
     .input(z.object({ planId: z.number() }))
     .mutation(async ({ ctx, input }) => {
@@ -250,10 +262,15 @@ export const subscriptionRouter = router({
         throw new TRPCError({ code: "CONFLICT", message: "Already subscribed to this creator" });
       }
 
-      // Check balance
-      const balance = await getUserBalance(db, ctx.user.id);
-      if (balance < plan.price) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "ポイント残高が不足しています" });
+      const isFreeplan = plan.price === 0;
+      let newBalance = 0;
+
+      if (!isFreeplan) {
+        // Check balance for paid plans
+        const balance = await getUserBalance(db, ctx.user.id);
+        if (balance < plan.price) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "ポイント残高が不足しています" });
+        }
       }
 
       // Create subscription
@@ -264,32 +281,49 @@ export const subscriptionRouter = router({
         userId: ctx.user.id,
         planId: input.planId,
         status: "active",
-        paymentMethod: "points",
+        paymentMethod: isFreeplan ? "free" : "points",
         startedAt: new Date(),
-        nextBillingAt,
-        lastPointDeductAt: new Date(),
+        nextBillingAt: isFreeplan ? null : nextBillingAt, // Free plans don't need billing
+        lastPointDeductAt: isFreeplan ? null : new Date(),
       }).returning();
 
-      // Deduct first month's points
-      const newBalance = await deductPoints(
-        db,
-        ctx.user.id,
-        plan.price,
-        subscription.id,
-        `月額サブスク: ${plan.name}`
-      );
+      if (!isFreeplan) {
+        // Deduct first month's points (only for paid plans)
+        newBalance = await deductPoints(
+          db,
+          ctx.user.id,
+          plan.price,
+          subscription.id,
+          `月額サブスク: ${plan.name}`
+        );
+
+        // Update creator's total support
+        await db.update(creators)
+          .set({ totalSupport: sql`${creators.totalSupport} + ${plan.price}` })
+          .where(eq(creators.id, plan.creatorId));
+      }
 
       // Update plan subscriber count
       await db.update(subscriptionPlans)
         .set({ subscriberCount: sql`${subscriptionPlans.subscriberCount} + 1` })
         .where(eq(subscriptionPlans.id, input.planId));
 
-      // Update creator's total support
-      await db.update(creators)
-        .set({ totalSupport: sql`${creators.totalSupport} + ${plan.price}` })
-        .where(eq(creators.id, plan.creatorId));
+      // Send notification to creator
+      const creator = await getCreatorById(plan.creatorId);
+      if (creator && creator.userId !== ctx.user.id) {
+        await createNotification({
+          userId: creator.userId,
+          type: "subscription",
+          title: isFreeplan ? "新しい無料会員" : "新しいサブスクライバー",
+          message: `「${plan.name}」プランに登録しました`,
+          actorId: ctx.user.id,
+          targetType: "subscription",
+          targetId: subscription.id,
+          link: `/dashboard`,
+        });
+      }
 
-      return { success: true, subscriptionId: subscription.id, newBalance };
+      return { success: true, subscriptionId: subscription.id, newBalance, isFreeplan };
     }),
 
   // Create Stripe subscription for non-adult plans

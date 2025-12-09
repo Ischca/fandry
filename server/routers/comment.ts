@@ -4,7 +4,8 @@ import {
   router,
   z,
 } from "./_shared";
-import { getCommentsByPostId, createComment } from "../db";
+import { getCommentsByPostId, createComment, getPostById, getCreatorById } from "../db";
+import { createNotification } from "./notification";
 
 export const commentRouter = router({
   getByPostId: publicProcedure
@@ -24,6 +25,25 @@ export const commentRouter = router({
         postId: input.postId,
         content: input.content,
       });
+
+      // Send notification to post creator
+      const post = await getPostById(input.postId);
+      if (post) {
+        const creator = await getCreatorById(post.creatorId);
+        if (creator && creator.userId !== ctx.user.id) {
+          await createNotification({
+            userId: creator.userId,
+            type: "comment",
+            title: "新しいコメント",
+            message: input.content.slice(0, 100),
+            actorId: ctx.user.id,
+            targetType: "post",
+            targetId: input.postId,
+            link: `/@${creator.username}/posts/${input.postId}`,
+          });
+        }
+      }
+
       return { success: true };
     }),
 });

@@ -63,6 +63,37 @@
 
 ---
 
+## 🚀 MVP必須機能（ローンチ前に実装）
+
+### P0: 必須（競合と戦うために絶対必要）(完了)
+- [x] 通知トリガーの実装
+  - [x] フォロー時の通知（server/routers/follow.ts）
+  - [x] いいね時の通知（server/routers/like.ts）
+  - [x] コメント時の通知（server/routers/comment.ts）
+  - [x] 新規投稿時の通知（server/routers/post.ts、server/cron/publishScheduledPosts.ts）
+  - [x] サブスク開始時の通知（server/routers/subscription.ts、server/stripe/webhook.ts）
+- [x] 予約投稿機能
+  - [x] postsテーブルにscheduledAt/publishedAt追加
+  - [x] 予約投稿のcronジョブ（server/cron/publishScheduledPosts.ts）
+  - [x] 投稿作成API対応（scheduledAtパラメータ追加）
+  - [x] 公開前の投稿はクリエイターのみ閲覧可能
+- [x] 有料投稿のプレビュー機能
+  - [x] postsテーブルにpreviewContent/previewMediaUrls追加
+  - [x] 投稿作成API対応（previewContentパラメータ追加）
+  - [x] 未購入ユーザーへのプレビュー表示（getPostWithAccessで実装）
+- [x] 無料会員プラン（tier=0）
+  - [x] price=0のプランを作成可能
+  - [x] 無料プランは「free」決済方法で登録
+  - [x] 無料プランでも会員限定投稿（tier=0）を閲覧可能（tierチェック実装）
+
+### P1: 推奨（初期ユーザー獲得後でも可）
+- [ ] バックナンバー販売機能
+  - [ ] 過去記事の個別購入オプション
+  - [ ] バックナンバー価格設定（クリエイター側）
+  - [ ] 購入済みバックナンバー管理
+
+---
+
 ## 進行中・今後の実装
 
 ### インフラ・運用
@@ -94,8 +125,7 @@
   - [x] 通知API（取得、既読、削除、全既読、全削除）
   - [x] ヘッダーの通知ベル復活
   - [x] 通知ドロップダウン（PopoverでUIを実装）
-  - [ ] 通知トリガー（フォロー、いいね、コメント、新規投稿、サブスク）
-- [ ] メッセージ機能
+  - [x] 通知トリガー（P0で実装完了）
 
 ### 管理機能
 - [ ] 管理者ダッシュボード

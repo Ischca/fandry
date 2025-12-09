@@ -1,4 +1,4 @@
-import { eq, and, or, desc, sql, ilike } from "drizzle-orm";
+import { eq, and, or, desc, sql, ilike, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import {
@@ -132,10 +132,16 @@ export async function updateCreator(id: number, updates: Partial<InsertCreator>)
 }
 
 // Post queries
-export async function getPostsByCreatorId(creatorId: number, limit = 20) {
+export async function getPostsByCreatorId(creatorId: number, limit = 20, includeScheduled = false) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(posts).where(eq(posts.creatorId, creatorId)).orderBy(desc(posts.createdAt)).limit(limit);
+
+  // Include scheduled posts only if explicitly requested (for creator's own view)
+  const conditions = includeScheduled
+    ? eq(posts.creatorId, creatorId)
+    : and(eq(posts.creatorId, creatorId), isNotNull(posts.publishedAt));
+
+  return db.select().from(posts).where(conditions).orderBy(desc(posts.createdAt)).limit(limit);
 }
 
 export async function getPostById(id: number) {
@@ -157,10 +163,14 @@ export async function getPostWithAccess(postId: number, userId?: number) {
       creatorId: posts.creatorId,
       title: posts.title,
       content: posts.content,
+      previewContent: posts.previewContent,
       type: posts.type,
       price: posts.price,
       membershipTier: posts.membershipTier,
       mediaUrls: posts.mediaUrls,
+      previewMediaUrls: posts.previewMediaUrls,
+      scheduledAt: posts.scheduledAt,
+      publishedAt: posts.publishedAt,
       likeCount: posts.likeCount,
       commentCount: posts.commentCount,
       viewCount: posts.viewCount,
@@ -168,6 +178,7 @@ export async function getPostWithAccess(postId: number, userId?: number) {
       creatorUsername: creators.username,
       creatorDisplayName: creators.displayName,
       creatorAvatarUrl: creators.avatarUrl,
+      creatorUserId: creators.userId,
     })
     .from(posts)
     .leftJoin(creators, eq(posts.creatorId, creators.id))
@@ -178,12 +189,25 @@ export async function getPostWithAccess(postId: number, userId?: number) {
 
   const post = result[0];
 
+  // Check if post is published or user is the creator
+  const isCreator = userId && post.creatorUserId === userId;
+  const isPublished = !!post.publishedAt;
+  const isScheduled = !!post.scheduledAt && !post.publishedAt;
+
+  // Unpublished posts are only visible to the creator
+  if (!isPublished && !isCreator) {
+    return null;
+  }
+
   // Check access rights
   let hasAccess = false;
   let isPurchased = false;
   let isSubscribed = false;
 
-  if (post.type === 'free') {
+  // Creator always has full access
+  if (isCreator) {
+    hasAccess = true;
+  } else if (post.type === 'free') {
     hasAccess = true;
   } else if (userId) {
     if (post.type === 'paid') {
@@ -196,9 +220,11 @@ export async function getPostWithAccess(postId: number, userId?: number) {
       isPurchased = purchase.length > 0;
       hasAccess = isPurchased;
     } else if (post.type === 'membership') {
-      // Check if user has active subscription
+      // Check if user has active subscription with sufficient tier
       const subscription = await db
-        .select()
+        .select({
+          tier: subscriptionPlans.tier,
+        })
         .from(subscriptions)
         .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
         .where(
@@ -209,16 +235,46 @@ export async function getPostWithAccess(postId: number, userId?: number) {
           )
         )
         .limit(1);
-      isSubscribed = subscription.length > 0;
-      hasAccess = isSubscribed;
+
+      if (subscription.length > 0) {
+        const userTier = subscription[0].tier ?? 0;
+        const requiredTier = post.membershipTier ?? 0;
+        // User's subscription tier must be >= required tier for the post
+        isSubscribed = true;
+        hasAccess = userTier >= requiredTier;
+      }
     }
   }
 
+  // For posts without access, return preview content instead of full content
+  const returnContent = hasAccess ? post.content : (post.previewContent || null);
+  const returnMediaUrls = hasAccess ? post.mediaUrls : (post.previewMediaUrls || null);
+  const hasPreview = !hasAccess && (!!post.previewContent || !!post.previewMediaUrls);
+
   return {
-    ...post,
+    id: post.id,
+    creatorId: post.creatorId,
+    title: post.title,
+    content: returnContent,
+    type: post.type,
+    price: post.price,
+    membershipTier: post.membershipTier,
+    mediaUrls: returnMediaUrls,
+    scheduledAt: post.scheduledAt,
+    publishedAt: post.publishedAt,
+    likeCount: post.likeCount,
+    commentCount: post.commentCount,
+    viewCount: post.viewCount,
+    createdAt: post.createdAt,
+    creatorUsername: post.creatorUsername,
+    creatorDisplayName: post.creatorDisplayName,
+    creatorAvatarUrl: post.creatorAvatarUrl,
     hasAccess,
     isPurchased,
     isSubscribed,
+    isScheduled,
+    isCreator,
+    hasPreview,
   };
 }
 
@@ -401,4 +457,19 @@ export async function getCreatorsByCategory(category: string, limit: number = 20
     .limit(limit);
 
   return result;
+}
+
+// Get all followers of a creator (for notifications)
+export async function getFollowersByCreatorId(creatorId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db
+    .select({
+      userId: follows.userId,
+    })
+    .from(follows)
+    .where(eq(follows.creatorId, creatorId));
+
+  return result.map(r => r.userId);
 }

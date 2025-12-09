@@ -91,12 +91,16 @@ export const posts = pgTable("posts", {
   creatorId: integer("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 256 }),
   content: text("content").notNull(),
+  previewContent: text("preview_content"), // 未購入ユーザー向けプレビューコンテンツ
   type: postTypeEnum("type").default("free").notNull(),
   price: bigint("price", { mode: "number" }).default(0), // 価格（円）
   membershipTier: integer("membership_tier").default(0), // 必要な会員ランク
   mediaUrls: text("media_urls"), // JSON array of URLs
+  previewMediaUrls: text("preview_media_urls"), // プレビュー用メディアURL（JSON array）
   isAdult: integer("is_adult").default(0).notNull(), // アダルトコンテンツ
   isPinned: integer("is_pinned").default(0).notNull(), // boolean as int
+  scheduledAt: timestamp("scheduled_at"), // 予約投稿日時（null=即時公開）
+  publishedAt: timestamp("published_at"), // 実際の公開日時（null=下書きまたは予約中）
   likeCount: integer("like_count").default(0).notNull(),
   commentCount: integer("comment_count").default(0).notNull(),
   viewCount: integer("view_count").default(0).notNull(),

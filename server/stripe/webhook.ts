@@ -19,6 +19,7 @@ import {
   failAuditLog,
   markForRecovery,
 } from "../lib/auditLogger";
+import { createNotification } from "../routers/notification";
 
 const router = Router();
 
@@ -239,12 +240,18 @@ async function completeStripeSubscription(
       return false;
     }
 
+    // Get creator info
+    const [creator] = await db.select()
+      .from(creators)
+      .where(eq(creators.id, plan.creatorId))
+      .limit(1);
+
     // Calculate next billing date (1 month from now)
     const nextBillingAt = new Date();
     nextBillingAt.setMonth(nextBillingAt.getMonth() + 1);
 
     // Create subscription record
-    await db.insert(subscriptions).values({
+    const [subscription] = await db.insert(subscriptions).values({
       userId,
       planId,
       status: "active",
@@ -252,7 +259,7 @@ async function completeStripeSubscription(
       stripeSubscriptionId,
       startedAt: new Date(),
       nextBillingAt,
-    });
+    }).returning();
 
     // Update plan subscriber count
     await db.update(subscriptionPlans)
@@ -263,6 +270,20 @@ async function completeStripeSubscription(
     await db.update(creators)
       .set({ totalSupport: sql`${creators.totalSupport} + ${plan.price}` })
       .where(eq(creators.id, plan.creatorId));
+
+    // Send notification to creator
+    if (creator && creator.userId !== userId) {
+      await createNotification({
+        userId: creator.userId,
+        type: "subscription",
+        title: "新しいサブスクライバー",
+        message: `「${plan.name}」プランに登録しました`,
+        actorId: userId,
+        targetType: "subscription",
+        targetId: subscription.id,
+        link: `/dashboard`,
+      });
+    }
 
     console.log(`Stripe subscription completed: User ${userId} subscribed to plan ${planId}`);
     return true;

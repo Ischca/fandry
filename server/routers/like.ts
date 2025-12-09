@@ -3,7 +3,8 @@ import {
   router,
   z,
 } from "./_shared";
-import { likePost, unlikePost, hasLiked } from "../db";
+import { likePost, unlikePost, hasLiked, getPostById, getCreatorById } from "../db";
+import { createNotification } from "./notification";
 
 export const likeRouter = router({
   toggle: protectedProcedure
@@ -15,6 +16,25 @@ export const likeRouter = router({
         return { liked: false };
       } else {
         await likePost(ctx.user.id, input.postId);
+
+        // Send notification to post creator
+        const post = await getPostById(input.postId);
+        if (post) {
+          const creator = await getCreatorById(post.creatorId);
+          if (creator && creator.userId !== ctx.user.id) {
+            await createNotification({
+              userId: creator.userId,
+              type: "like",
+              title: "いいね",
+              message: `「${post.title || "投稿"}」にいいねしました`,
+              actorId: ctx.user.id,
+              targetType: "post",
+              targetId: input.postId,
+              link: `/@${creator.username}/posts/${input.postId}`,
+            });
+          }
+        }
+
         return { liked: true };
       }
     }),

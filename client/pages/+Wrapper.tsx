@@ -9,15 +9,19 @@ import { TooltipProvider } from "../src/components/ui/tooltip";
 import ErrorBoundary from "../src/components/ErrorBoundary";
 import { AgeVerification } from "../src/components/AgeVerification";
 import { ThemeProvider } from "../src/contexts/ThemeContext";
+import { usePageContext } from "vike-react/usePageContext";
+import type { InitialState } from "@clerk/shared/types";
+import { ClerkAvailableContext } from "../src/_core/hooks/useAuth";
+import { Router } from "wouter";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 // SSR環境かどうかを判定
 const isServer = typeof window === "undefined";
 
-// tRPC Provider（Clerkの中で使用）
+// tRPC Provider（Clerkの中で使用、認証トークンを自動付与）
 function TrpcProviderWithAuth({ children }: { children: React.ReactNode }) {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded } = useAuth();
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
 
@@ -29,6 +33,9 @@ function TrpcProviderWithAuth({ children }: { children: React.ReactNode }) {
           url: "/api/trpc",
           transformer: superjson,
           async headers() {
+            if (!isLoaded) {
+              return {};
+            }
             const token = await getTokenRef.current();
             return token ? { Authorization: `Bearer ${token}` } : {};
           },
@@ -65,21 +72,37 @@ function TrpcProviderNoAuth({ children }: { children: React.ReactNode }) {
   );
 }
 
-// SSR時のレンダリング（Clerkなし、基本的なtRPCのみ）
-function SSRWrapper({ children }: { children: React.ReactNode }) {
+// SSR用の基本Wrapper（Clerkなし）
+function SSRWrapper({
+  children,
+  ssrPath,
+  ssrSearch,
+}: {
+  children: React.ReactNode;
+  ssrPath: string;
+  ssrSearch?: string;
+}) {
   return (
-    <TrpcProviderNoAuth>
-      <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          {children}
-        </TooltipProvider>
-      </ThemeProvider>
-    </TrpcProviderNoAuth>
+    <ClerkAvailableContext.Provider value={false}>
+      <Router ssrPath={ssrPath} ssrSearch={ssrSearch}>
+        <TrpcProviderNoAuth>
+          <ThemeProvider defaultTheme="light">
+            <TooltipProvider>{children}</TooltipProvider>
+          </ThemeProvider>
+        </TrpcProviderNoAuth>
+      </Router>
+    </ClerkAvailableContext.Provider>
   );
 }
 
-// クライアント側のフルレンダリング（Clerk + tRPC）
-function ClientFullWrapper({ children }: { children: React.ReactNode }) {
+// クライアント用Wrapper（Clerk + 全機能）
+function ClientWrapper({
+  children,
+  initialState,
+}: {
+  children: React.ReactNode;
+  initialState: InitialState | null | undefined;
+}) {
   if (!CLERK_PUBLISHABLE_KEY) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -94,41 +117,59 @@ function ClientFullWrapper({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <TrpcProviderWithAuth>
-        <ThemeProvider defaultTheme="light">
-          <TooltipProvider>
-            <Toaster />
-            <AgeVerification>
-              {children}
-            </AgeVerification>
-          </TooltipProvider>
-        </ThemeProvider>
-      </TrpcProviderWithAuth>
+    <ClerkProvider
+      publishableKey={CLERK_PUBLISHABLE_KEY}
+      initialState={initialState ?? undefined}
+    >
+      <ClerkAvailableContext.Provider value={true}>
+        <TrpcProviderWithAuth>
+          <ThemeProvider defaultTheme="light">
+            <TooltipProvider>
+              <Toaster />
+              <AgeVerification>{children}</AgeVerification>
+            </TooltipProvider>
+          </ThemeProvider>
+        </TrpcProviderWithAuth>
+      </ClerkAvailableContext.Provider>
     </ClerkProvider>
   );
 }
 
 export function Wrapper({ children }: { children: React.ReactNode }) {
+  const pageContext = usePageContext();
+  const clerkInitialState = (pageContext as { clerkInitialState?: InitialState | null })
+    .clerkInitialState;
+
+  // URLをpageContextから取得（SSR用）
+  // urlPathname: パス部分（例: /test-ssr）
+  // urlParsed.search: クエリ文字列のオブジェクト
+  const ssrPath = pageContext.urlPathname || "/";
+  const ssrSearch = pageContext.urlParsed?.searchOriginal || "";
+
+  // クライアントでマウント済みかどうか
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // SSR時またはハイドレーション前
+  // SSR時またはクライアントでまだマウントされていない場合
+  // → SSRWrapperを使用（Clerkなし、ハイドレーション用）
   if (isServer || !mounted) {
     return (
       <ErrorBoundary>
-        <SSRWrapper>{children}</SSRWrapper>
+        <SSRWrapper ssrPath={ssrPath} ssrSearch={ssrSearch}>
+          {children}
+        </SSRWrapper>
       </ErrorBoundary>
     );
   }
 
-  // クライアントでハイドレーション完了後
+  // クライアントでマウント後
+  // → ClientWrapperを使用（Clerk有効）
   return (
     <ErrorBoundary>
-      <ClientFullWrapper>{children}</ClientFullWrapper>
+      <ClientWrapper initialState={clerkInitialState}>{children}</ClientWrapper>
     </ErrorBoundary>
   );
 }

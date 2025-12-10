@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { SignInButton, UserButton } from "@clerk/clerk-react";
+import { ClientSignInButton, ClientUserButton } from "@/components/clerk/ClientOnlyClerk";
 import { Heart, Sparkles, Users, Zap, ArrowRight, Star } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect } from "react";
@@ -39,16 +39,16 @@ export default function Home() {
                 <Link href="/my">
                   <Button className="shine-effect font-medium">マイページ</Button>
                 </Link>
-                <UserButton afterSignOutUrl="/" />
+                <ClientUserButton afterSignOutUrl="/" />
               </>
             ) : (
               <>
                 <Link href="/discover">
                   <Button variant="ghost" className="font-medium">クリエイターを探す</Button>
                 </Link>
-                <SignInButton mode="modal">
+                <ClientSignInButton mode="modal">
                   <Button className="shine-effect font-medium">ログイン</Button>
-                </SignInButton>
+                </ClientSignInButton>
               </>
             )}
           </nav>
@@ -98,11 +98,11 @@ export default function Home() {
               </Button>
             </Link>
             {!isAuthenticated && (
-              <SignInButton mode="modal">
+              <ClientSignInButton mode="modal">
                 <Button size="lg" variant="outline" className="text-lg px-8 h-14 border-2 hover:bg-secondary">
                   無料で始める
                 </Button>
-              </SignInButton>
+              </ClientSignInButton>
             )}
           </div>
 

@@ -1,2 +1,2 @@
 // ホームページ - SSR対応
-export { default } from "../../src/pages/Home";
+export { default as Page } from "../../src/pages/Home";

@@ -39,9 +39,12 @@ export async function setupVite(app: Express, server: Server) {
         return next();
       }
 
-      const { statusCode, headers, body } = httpResponse;
+      const { statusCode, headers } = httpResponse;
       headers.forEach(([name, value]) => res.setHeader(name, value));
-      res.status(statusCode).send(body);
+      res.status(statusCode);
+
+      // ストリーミングSSRをサポート
+      httpResponse.pipe(res);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -83,9 +86,12 @@ export async function serveStatic(app: Express) {
         return next();
       }
 
-      const { statusCode, headers, body } = httpResponse;
+      const { statusCode, headers } = httpResponse;
       headers.forEach(([name, value]) => res.setHeader(name, value));
-      res.status(statusCode).send(body);
+      res.status(statusCode);
+
+      // ストリーミングSSRをサポート
+      httpResponse.pipe(res);
     } catch (e) {
       console.error("SSR Error:", e);
       next(e);

@@ -16,12 +16,6 @@ import { Router } from "wouter";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
-// デバッグ: ビルド時の環境変数確認（本番デプロイ後に削除）
-if (typeof window !== "undefined") {
-  console.log("[Clerk Debug] VITE_CLERK_PUBLISHABLE_KEY exists:", !!CLERK_PUBLISHABLE_KEY);
-  console.log("[Clerk Debug] Key prefix:", CLERK_PUBLISHABLE_KEY?.substring(0, 10) || "EMPTY");
-}
-
 // SSR環境かどうかを判定
 const isServer = typeof window === "undefined";
 

@@ -72,7 +72,42 @@ function TrpcProviderNoAuth({ children }: { children: React.ReactNode }) {
   );
 }
 
-// SSR用の基本Wrapper（Clerkなし）
+// クライアント専用Wrapper（Clerkあり）
+function ClientWrapperWithClerk({
+  children,
+  ssrPath,
+  ssrSearch,
+  clerkInitialState,
+  isClerkAvailable,
+}: {
+  children: React.ReactNode;
+  ssrPath: string;
+  ssrSearch: string;
+  clerkInitialState: InitialState | null | undefined;
+  isClerkAvailable: boolean;
+}) {
+  return (
+    <ClerkProvider
+      publishableKey={CLERK_PUBLISHABLE_KEY!}
+      initialState={clerkInitialState ?? undefined}
+    >
+      <ClerkAvailableContext.Provider value={isClerkAvailable}>
+        <Router ssrPath={ssrPath} ssrSearch={ssrSearch}>
+          <TrpcProviderWithAuth>
+            <ThemeProvider defaultTheme="light">
+              <TooltipProvider>
+                <Toaster />
+                <AgeVerification>{children}</AgeVerification>
+              </TooltipProvider>
+            </ThemeProvider>
+          </TrpcProviderWithAuth>
+        </Router>
+      </ClerkAvailableContext.Provider>
+    </ClerkProvider>
+  );
+}
+
+// SSR/初回レンダリング用Wrapper（Clerkなし）
 function SSRWrapper({
   children,
   ssrPath,
@@ -80,7 +115,7 @@ function SSRWrapper({
 }: {
   children: React.ReactNode;
   ssrPath: string;
-  ssrSearch?: string;
+  ssrSearch: string;
 }) {
   return (
     <ClerkAvailableContext.Provider value={false}>
@@ -95,66 +130,25 @@ function SSRWrapper({
   );
 }
 
-// クライアント用Wrapper（Clerk + 全機能）
-function ClientWrapper({
-  children,
-  initialState,
-}: {
-  children: React.ReactNode;
-  initialState: InitialState | null | undefined;
-}) {
-  if (!CLERK_PUBLISHABLE_KEY) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-xl font-bold text-red-600">Configuration Error</h1>
-          <p className="mt-2 text-muted-foreground">
-            Missing VITE_CLERK_PUBLISHABLE_KEY environment variable
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <ClerkProvider
-      publishableKey={CLERK_PUBLISHABLE_KEY}
-      initialState={initialState ?? undefined}
-    >
-      <ClerkAvailableContext.Provider value={true}>
-        <TrpcProviderWithAuth>
-          <ThemeProvider defaultTheme="light">
-            <TooltipProvider>
-              <Toaster />
-              <AgeVerification>{children}</AgeVerification>
-            </TooltipProvider>
-          </ThemeProvider>
-        </TrpcProviderWithAuth>
-      </ClerkAvailableContext.Provider>
-    </ClerkProvider>
-  );
-}
-
 export function Wrapper({ children }: { children: React.ReactNode }) {
   const pageContext = usePageContext();
   const clerkInitialState = (pageContext as { clerkInitialState?: InitialState | null })
     .clerkInitialState;
 
   // URLをpageContextから取得（SSR用）
-  // urlPathname: パス部分（例: /test-ssr）
-  // urlParsed.search: クエリ文字列のオブジェクト
   const ssrPath = pageContext.urlPathname || "/";
   const ssrSearch = pageContext.urlParsed?.searchOriginal || "";
 
   // クライアントでマウント済みかどうか
+  // SSRとクライアント初回レンダリングでは同じ構造を使う
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // SSR時またはクライアントでまだマウントされていない場合
-  // → SSRWrapperを使用（Clerkなし、ハイドレーション用）
+  // SSR時 または クライアント初回レンダリング時はSSRWrapperを使用
+  // これによりハイドレーションの不整合を防ぐ
   if (isServer || !mounted) {
     return (
       <ErrorBoundary>
@@ -165,11 +159,33 @@ export function Wrapper({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // クライアントでマウント後
-  // → ClientWrapperを使用（Clerk有効）
+  // クライアントでマウント後、Clerk keyがない場合
+  if (!CLERK_PUBLISHABLE_KEY) {
+    return (
+      <ErrorBoundary>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-red-600">Configuration Error</h1>
+            <p className="mt-2 text-muted-foreground">
+              Missing VITE_CLERK_PUBLISHABLE_KEY environment variable
+            </p>
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  // クライアントでマウント後、Clerkを有効化
   return (
     <ErrorBoundary>
-      <ClientWrapper initialState={clerkInitialState}>{children}</ClientWrapper>
+      <ClientWrapperWithClerk
+        ssrPath={ssrPath}
+        ssrSearch={ssrSearch}
+        clerkInitialState={clerkInitialState}
+        isClerkAvailable={true}
+      >
+        {children}
+      </ClientWrapperWithClerk>
     </ErrorBoundary>
   );
 }

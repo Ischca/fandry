@@ -1,0 +1,27 @@
+{
+    "mcpServers": {
+        "context7": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "-y",
+                "@upstash/context7-mcp"
+            ]
+        },
+        "chrome-devtools": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "-y",
+                "chrome-devtools-mcp@latest"
+            ]
+        },
+        "Railway": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@railway/mcp-server"
+            ]
+        }
+    }
+}

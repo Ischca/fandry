@@ -34,7 +34,10 @@ export default defineConfig({
           }
           // Clerk authentication
           if (id.includes("node_modules/@clerk/")) {
-            return "vendor-clerk";
+            // Clerk depends on React; keeping them in the same chunk avoids
+            // circular chunk imports (vendor-react <-> vendor-clerk) that can
+            // break ESM initialization in production builds.
+            return "vendor-react";
           }
           // tRPC and React Query
           if (id.includes("node_modules/@trpc/") || id.includes("node_modules/@tanstack/")) {

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { SignInButton } from "@clerk/clerk-react";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth, ClerkAvailableContext } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { PointBalance } from "@/components/PointBalance";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -14,7 +14,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { trpc } from "@/lib/trpc";
 
@@ -25,6 +25,7 @@ interface HeaderProps {
 
 export function Header({ minimal = false }: HeaderProps) {
   const { isAuthenticated, user } = useAuth();
+  const isClerkAvailable = useContext(ClerkAvailableContext);
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -163,9 +164,12 @@ export function Header({ minimal = false }: HeaderProps) {
                   クリエイターを探す
                 </Button>
               </Link>
-              <SignInButton mode="modal">
-                <Button size="sm">ログイン</Button>
-              </SignInButton>
+              {/* SSR時はClerkが利用できないのでSignInButtonを表示しない */}
+              {isClerkAvailable && (
+                <SignInButton mode="modal">
+                  <Button size="sm">ログイン</Button>
+                </SignInButton>
+              )}
             </>
           )}
         </div>

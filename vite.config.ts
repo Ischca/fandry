@@ -28,32 +28,12 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // React core
-          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
-            return "vendor-react";
-          }
-          // Clerk authentication
-          if (id.includes("node_modules/@clerk/")) {
-            // Clerk depends on React; keeping them in the same chunk avoids
-            // circular chunk imports (vendor-react <-> vendor-clerk) that can
-            // break ESM initialization in production builds.
-            return "vendor-react";
-          }
-          // tRPC and React Query
-          if (id.includes("node_modules/@trpc/") || id.includes("node_modules/@tanstack/")) {
-            return "vendor-trpc";
-          }
-          // Radix UI components
-          if (id.includes("node_modules/@radix-ui/")) {
-            return "vendor-radix";
-          }
-          // Lucide icons
-          if (id.includes("node_modules/lucide-react/")) {
-            return "vendor-icons";
-          }
-          // Other large libraries
-          if (id.includes("node_modules/superjson/") || id.includes("node_modules/zod/")) {
-            return "vendor-utils";
+          // Keep all node_modules in a single vendor chunk.
+          // The previous fine-grained splitting caused circular chunk imports
+          // (e.g., React <-> Radix, React <-> Clerk) which can break ESM
+          // initialization in production.
+          if (id.includes("node_modules/")) {
+            return "vendor";
           }
         },
       },
